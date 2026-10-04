@@ -1,8 +1,8 @@
-# cc-notify-telegram (ai-notify-telegram)
+# cc-notify-telegram
 
 🌐 [English](README.md) · Tiếng Việt
 
-> ⚠️ **Chỉ nhận thông báo "xong việc", không thấy permission/plan?** `remote-perm` chỉ hoạt động khi `remote` cũng đang bật. Chạy `npx -y github:sdc-ren/cc-notify-telegram status`, rồi `remote on claude` và `remote-perm on claude`; xong khởi động lại session.
+> ⚠️ **Chỉ nhận thông báo "xong việc", không thấy permission/plan?** `remote-perm` chỉ hoạt động khi `remote` cũng đang bật. Chạy `status`, rồi `remote on claude` và `remote-perm on claude`; xong khởi động lại session.
 
 **Claude Code, OpenAI Codex & Google Antigravity ↔ Telegram** — để AI Agent làm việc, còn bạn đi đâu cũng được.
 
@@ -44,66 +44,62 @@ npm test
    [ ✅ Cho phép tất cả (30′) ]  [ 🖥 Để máy xử lý ]
 ```
 
+## Mục lục
+
+- [Yêu cầu](#yêu-cầu)
+- [Cài đặt](#cài-đặt)
+  - [1. Tạo bot Telegram](#1-tạo-bot-telegram)
+  - [2. Chạy trình cài đặt](#2-chạy-trình-cài-đặt)
+  - [3. Tạo lệnh gõ ngắn (tuỳ chọn)](#3-tạo-lệnh-gõ-ngắn-tuỳ-chọn)
+- [Sử dụng](#sử-dụng)
+- [Telegram Topics cho từng Agent](#telegram-topics-cho-từng-agent)
+- [Cách hoạt động](#cách-hoạt-động)
+- [Lệnh CLI](#lệnh-cli)
+- [Config](#config)
+- [Troubleshooting & Bảo mật](#troubleshooting--bảo-mật)
+- [Gỡ cài đặt](#gỡ-cài-đặt)
+- [Đóng góp](#đóng-góp)
+- [Giấy phép](#giấy-phép)
+
 ---
 
 ## Yêu cầu
 
-- **Node.js ≥ 18** (bạn cài bằng `npx` nên chắc chắn có).
+- **Node.js ≥ 18.17** và `git` (gói được cài thẳng từ GitHub).
 - Một hoặc nhiều AI Agent: **Claude Code**, **OpenAI Codex**, **Google Antigravity**.
 - Một **bot Telegram** (miễn phí, tạo trong 1 phút — hướng dẫn ngay dưới).
+- macOS / Linux / Windows (CI chạy test trên cả 3).
 
-Hỗ trợ macOS / Linux / Windows (CI chạy test trên cả 3).
+## Cài đặt
 
-## Bước 1 — Tạo bot Telegram
+> **Gói chưa được publish lên npm**, nên `npx cc-notify-telegram` sẽ báo 404. Mọi lệnh bên dưới đều chạy thẳng từ GitHub.
+
+### 1. Tạo bot Telegram
 
 1. Mở Telegram, chat với **@BotFather** → gõ `/newbot` → đặt tên → BotFather trả về **bot token** dạng `123456789:AAxxxxxxxx...`. Giữ token này bí mật.
 2. **Add bot vào group** mà bạn muốn nhận thông báo (hoặc chat riêng với bot cũng được).
 3. Trong group, **mention @tên_bot hoặc reply một tin của bot** một câu bất kỳ — để bot "nhìn thấy" group (bot mặc định bật *privacy mode*: chỉ thấy tin mention/reply nó; tool này thiết kế tương thích sẵn, **không cần tắt privacy mode**).
 
-## Bước 2 — Cài đặt
+### 2. Chạy trình cài đặt
 
 ```bash
 npx -y github:sdc-ren/cc-notify-telegram
-# Hoặc dùng alias lệnh mới:
-npx -y github:sdc-ren/cc-notify-telegram init
 ```
 
-Wizard sẽ dẫn từng bước:
+Lần chạy đầu phải tải repo nên mất vài giây. Wizard dẫn từng bước:
 
-1. **Chọn AI Agent** — chọn cài đặt cho Claude Code, OpenAI Codex, Google Antigravity (hoặc cả 3).
-2. **Bot token** — dán token từ BotFather (token được xác thực ngay bằng `getMe`).
-3. **Chat ID** — không cần biết trước: bấm Enter để wizard **tự dò** các chat/topic bot vừa thấy và chọn từ danh sách (hoặc gõ thẳng ID nếu đã biết).
+1. **Chọn AI Agent** — Claude Code, OpenAI Codex, Google Antigravity (hoặc cả 3).
+2. **Bot token** — dán token từ BotFather (xác thực ngay bằng `getMe`).
+3. **Chat ID** — bấm Enter để wizard **tự dò** các chat/topic bot vừa thấy và chọn từ danh sách (hoặc gõ thẳng ID nếu đã biết).
 4. Wizard tự làm phần còn lại:
-   - ghi config vào `~/.config/ai-notify-telegram/config.json` (chmod 600, tự động chuyển đổi từ config `~/.claude/` cũ nếu có),
+   - ghi config vào `~/.config/ai-notify-telegram/config.json` (chmod 600, tự chuyển đổi từ config `~/.claude/` cũ nếu có),
    - copy hook runtime vào `~/.claude/hooks/cc-notify-telegram.mjs`,
-   - đăng ký hooks vào file cấu hình của từng Agent (`~/.claude/settings.json`, `~/.codex/config.json`, `~/.gemini/config/settings.json`),
+   - đăng ký hooks vào cấu hình từng Agent (`~/.claude/settings.json`, `~/.codex/config.json`, `~/.gemini/config/settings.json`),
    - hỏi có bật **Remote Permission** không (mặc định *không*); đồng ý thì dò luôn Telegram user ID được phép duyệt,
-   - hỏi trước khi thêm block hướng dẫn marker vào file hướng dẫn của Agent (`CLAUDE.md`, `CODEX.md`, `AGENTS.md`),
+   - hỏi trước khi thêm block hướng dẫn marker vào `CLAUDE.md`, `CODEX.md`, `AGENTS.md`,
    - gửi một **tin test** để xác nhận thông suốt.
 
-### Chạy lệnh qua npx (từ GitHub)
-
-Gói **chưa được publish lên npm**, nên `npx cc-notify-telegram` sẽ báo 404. Hãy chạy thẳng từ GitHub:
-
-```bash
-npx -y github:sdc-ren/cc-notify-telegram <lệnh>
-# ví dụ
-npx -y github:sdc-ren/cc-notify-telegram status
-npx -y github:sdc-ren/cc-notify-telegram remote on claude
-```
-
-Lần chạy đầu phải tải repo nên mất vài giây. Muốn khoá phiên bản, thêm nhánh, tag hoặc commit: `github:sdc-ren/cc-notify-telegram#main` hoặc `#<commit-sha>`.
-
-Muốn gõ ngắn hơn, cài global một lần rồi bỏ tiền tố `npx`:
-
-```bash
-npm i -g github:sdc-ren/cc-notify-telegram
-cc-notify-telegram status        # hoặc: ai-notify-telegram status
-```
-
-Các ví dụ phía dưới đều dùng `npx -y github:sdc-ren/cc-notify-telegram`; nếu đã cài global, thay bằng `cc-notify-telegram`.
-
-### Cài không cần hỏi đáp (non-interactive)
+Cài không cần hỏi đáp (CI, dotfiles):
 
 ```bash
 npx -y github:sdc-ren/cc-notify-telegram init \
@@ -112,6 +108,60 @@ npx -y github:sdc-ren/cc-notify-telegram init \
 # Tuỳ chọn: --thread-id 42  --lang en  --silent  --no-test  --no-claude-md
 # Bật luôn Remote Permission (lặp --allow-user được, hoặc ngăn cách bằng dấu phẩy):
 #   --allow-user 111222333 --allow-user 444555666
+```
+
+Muốn khoá phiên bản, thêm nhánh, tag hoặc commit: `github:sdc-ren/cc-notify-telegram#main` hoặc `#<commit-sha>`.
+
+### 3. Tạo lệnh gõ ngắn (tuỳ chọn)
+
+Gõ `npx -y github:sdc-ren/cc-notify-telegram ...` mỗi lần rất dài. Chọn **một** trong hai cách dưới. Hook mà trình cài đặt đăng ký **không phụ thuộc** bước này; nó chỉ giúp gọi CLI (`status`, `remote on`, ...) tiện hơn.
+
+**Cách A: cài global (khuyên dùng).** Tạo lệnh thật `cc-notify-telegram` và `ai-notify-telegram`, chạy được ở mọi shell, không phải sửa rc file.
+
+```bash
+npm i -g github:sdc-ren/cc-notify-telegram
+cc-notify-telegram status
+```
+
+Cập nhật: chạy lại đúng lệnh trên. Gỡ: `npm rm -g cc-notify-telegram`.
+
+**Cách B: alias trong shell.** Luôn chạy bản mới nhất trên GitHub, không cần cài global. Thêm một dòng vào file cấu hình shell rồi mở lại shell (hoặc `source` file đó):
+
+| Shell | File | Dòng cần thêm |
+|---|---|---|
+| zsh | `~/.zshrc` | `alias cc-notify='npx -y github:sdc-ren/cc-notify-telegram'` |
+| bash | `~/.bashrc` (macOS: `~/.bash_profile`) | `alias cc-notify='npx -y github:sdc-ren/cc-notify-telegram'` |
+| fish | chạy một lần: `alias --save cc-notify 'npx -y github:sdc-ren/cc-notify-telegram'` | |
+| PowerShell | `$PROFILE` | `function cc-notify { npx -y github:sdc-ren/cc-notify-telegram @args }` |
+
+Sau đó dùng:
+
+```bash
+cc-notify status
+cc-notify remote on claude
+```
+
+Alias chỉ có trong shell tương tác, không dùng được trong script hay CI. Ở đó hãy dùng dạng đầy đủ `npx -y github:...` hoặc Cách A.
+
+> **Quy ước trong README.** Ví dụ viết dạng `cc-notify-telegram <lệnh>`. Nếu chưa tạo lệnh ngắn, dùng `npx -y github:sdc-ren/cc-notify-telegram <lệnh>`; nếu dùng alias Cách B, dùng `cc-notify <lệnh>`.
+>
+> Hook đã cài là một **bản sao** trong `~/.claude/hooks/`. Sau khi cập nhật CLI, chạy lại `cc-notify-telegram init` để làm mới nó.
+
+## Sử dụng
+
+Tin "xong việc" hoạt động ngay sau khi cài. Remote Ask và Remote Permission là tuỳ chọn:
+
+```bash
+cc-notify-telegram remote on          # Remote Ask
+cc-notify-telegram remote-perm on     # Remote Permission (cần allowedUserIds)
+```
+
+> **Lưu ý quan trọng: `remote-perm` yêu cầu `remote` đang bật.** Tin permission và plan chỉ được gửi khi công tắc `remote` (toàn cục *và* theo Agent) bật. Nếu `status` hiện `Remote Ask: off` thì bạn sẽ không nhận tin permission/plan dù Remote Permission đã bật.
+
+Khởi động lại session Agent sau khi đổi công tắc, rồi kiểm tra:
+
+```bash
+cc-notify-telegram status
 ```
 
 ---
@@ -226,15 +276,15 @@ Hỗ trợ cả lệnh `cc-notify-telegram` và alias `ai-notify-telegram`:
 
 | Lệnh | Việc |
 |---|---|
-| `npx -y github:sdc-ren/cc-notify-telegram` *(hoặc `init`)* | Wizard cài đặt / cài lại / đổi config cho các Agent |
-| `npx -y github:sdc-ren/cc-notify-telegram test` | Gửi tin test |
-| `npx -y github:sdc-ren/cc-notify-telegram status` | Doctor: Dashboard matrix kiểm tra sức khỏe của Claude Code, Codex, Antigravity |
-| `npx -y github:sdc-ren/cc-notify-telegram remote on [provider]` | Bật Remote Ask toàn cục hoặc cho riêng từng Agent (`claude`, `antigravity`; Codex Ask cần App Server bridge) |
-| `npx -y github:sdc-ren/cc-notify-telegram remote off [provider]` | Tắt Remote Ask toàn cục hoặc cho riêng từng Agent |
-| `npx -y github:sdc-ren/cc-notify-telegram remote-perm on [provider]` | Bật Remote Permission toàn cục hoặc cho riêng từng Agent |
-| `npx -y github:sdc-ren/cc-notify-telegram remote-perm off [provider]` | Tắt Remote Permission toàn cục hoặc cho riêng từng Agent |
-| `npx -y github:sdc-ren/cc-notify-telegram codex-bridge` | Stdio proxy cho Codex App Server, intercept ASK và approval requests qua Telegram |
-| `npx -y github:sdc-ren/cc-notify-telegram uninstall` | Gỡ hooks khỏi các Agent (`--purge`: xoá cả config/token, state, block instruction) |
+| `cc-notify-telegram` *(hoặc `init`)* | Wizard cài đặt / cài lại / đổi config cho các Agent |
+| `cc-notify-telegram test` | Gửi tin test |
+| `cc-notify-telegram status` | Doctor: Dashboard matrix kiểm tra sức khỏe của Claude Code, Codex, Antigravity |
+| `cc-notify-telegram remote on [provider]` | Bật Remote Ask toàn cục hoặc cho riêng từng Agent (`claude`, `antigravity`; Codex Ask cần App Server bridge) |
+| `cc-notify-telegram remote off [provider]` | Tắt Remote Ask toàn cục hoặc cho riêng từng Agent |
+| `cc-notify-telegram remote-perm on [provider]` | Bật Remote Permission toàn cục hoặc cho riêng từng Agent |
+| `cc-notify-telegram remote-perm off [provider]` | Tắt Remote Permission toàn cục hoặc cho riêng từng Agent |
+| `cc-notify-telegram codex-bridge` | Stdio proxy cho Codex App Server, intercept ASK và approval requests qua Telegram |
+| `cc-notify-telegram uninstall` | Gỡ hooks khỏi các Agent (`--purge`: xoá cả config/token, state, block instruction) |
 
 ---
 
@@ -268,8 +318,8 @@ Env override (ưu tiên hơn file — tiện CI): `TELEGRAM_BOT_TOKEN`, `TELEGRA
 - **Fail-Closed Authorization**: `allowedUserIds` kiểm tra Telegram `from.id` (do Telegram server ký, không thể giả mạo). Rỗng = không ai duyệt được từ xa.
 - **Fail-Safe Fallback**: Mất mạng / hết hạn chờ / lỗi Telegram → tự động chuyển về giao diện máy local, không bao giờ tự động duyệt.
 - **Smart Topic Fallback**: Nếu `threadId` không hợp lệ hoặc Topic bị xóa, tin nhắn tự động fallback về chat chính của Group.
-- **`group chat was upgraded to a supergroup chat`**: Telegram đã đổi group thường thành supergroup, nên `chatId` cũ không dùng được nữa. Lỗi Telegram thường kèm `migrate_to_chat_id`; cập nhật `chatId` trong `~/.config/ai-notify-telegram/config.json` sang ID mới dạng `-100...`, rồi chạy lại `npx -y github:sdc-ren/cc-notify-telegram test`.
-- **`The operation was aborted due to timeout` / `fetch failed`**: thường là Telegram API hoặc mạng đang chậm/chặn kết nối. Bản mới dùng timeout 30 giây và báo lỗi rõ hơn. Hãy retry, kiểm tra mạng/VPN/proxy, rồi chạy `npx -y github:sdc-ren/cc-notify-telegram test`. Nếu dùng bản npm/cache cũ, chạy từ GitHub repo mới nhất: `npx -y github:sdc-ren/cc-notify-telegram test`.
+- **`group chat was upgraded to a supergroup chat`**: Telegram đã đổi group thường thành supergroup, nên `chatId` cũ không dùng được nữa. Lỗi Telegram thường kèm `migrate_to_chat_id`; cập nhật `chatId` trong `~/.config/ai-notify-telegram/config.json` sang ID mới dạng `-100...`, rồi chạy lại `cc-notify-telegram test`.
+- **`The operation was aborted due to timeout` / `fetch failed`**: thường là Telegram API hoặc mạng đang chậm/chặn kết nối. Bản mới dùng timeout 30 giây và báo lỗi rõ hơn. Hãy retry, kiểm tra mạng/VPN/proxy, rồi chạy `cc-notify-telegram test`. Nếu dùng bản cache cũ, chạy từ GitHub repo mới nhất: `npx -y github:sdc-ren/cc-notify-telegram test`.
 - **Tin không vào đúng topic**: kiểm tra `providerThreads` có đúng provider key (`claude`, `codex`, `antigravity`) và đúng `message_thread_id`. `threadId` là topic mặc định; `providerThreads.<provider>` sẽ ưu tiên hơn `threadId`.
 
 ---
@@ -277,18 +327,24 @@ Env override (ưu tiên hơn file — tiện CI): `TELEGRAM_BOT_TOKEN`, `TELEGRA
 ## Gỡ cài đặt
 
 ```bash
-npx -y github:sdc-ren/cc-notify-telegram uninstall          # gỡ hooks (giữ config/token)
-npx -y github:sdc-ren/cc-notify-telegram uninstall --purge  # xoá sạch cả config + block instructions
+cc-notify-telegram uninstall          # gỡ hooks (giữ config/token)
+cc-notify-telegram uninstall --purge  # xoá sạch cả config + block instructions
 ```
 
 ---
 
-## English (condensed)
+## Đóng góp
 
-**cc-notify-telegram (ai-notify-telegram)** connects **Claude Code**, **OpenAI Codex**, and **Google Antigravity** to Telegram:
-1. **Completion & Escalation Pings**: Sends a condensed summary when an agent finishes a task (via hidden `<!-- AI_NOTIFY_DONE: … -->` or `<!-- CC_NOTIFY_DONE: … -->` markers in `CLAUDE.md`, `CODEX.md`, or `AGENTS.md`) plus a 🛑 ping when an agent is stuck.
-2. **Remote Ask**: Intercepts user questions sent by Claude (`AskUserQuestion`) or Antigravity (`ask_question`), forwards them to Telegram tagged `[Agent · Project · Session]`, and feeds your reply ("1A", "2B", free text) back into the session. Codex Ask is supported through the Codex App Server stdio bridge when a real `item/tool/requestUserInput` request is emitted (`tool/requestUserInput`, experimental).
-3. **Remote Permission**: Intercepts command/tool permission dialogs (`PermissionRequest`, Codex App Server approval requests, command approval, `ask_permission`), sending inline approval buttons (Allow / Deny / Allow-all-for-session / Handle at machine). Only Telegram user IDs in `allowedUserIds` can approve (fail-closed).
-4. **Multi-Agent & Per-Provider Controls**: Manage settings globally or per-agent (`npx -y github:sdc-ren/cc-notify-telegram remote on codex`, `npx -y github:sdc-ren/cc-notify-telegram remote-perm off claude`). Smart Telegram topic fallback ensures messages are never lost even if a forum thread is deleted.
+Issue và pull request luôn được chào đón.
 
-Install: `npx -y github:sdc-ren/cc-notify-telegram` (or `npx -y github:sdc-ren/cc-notify-telegram`). Requires Node ≥ 18; supports macOS, Linux, Windows. Use `--lang en` for English messages and instruction snippets.
+```bash
+git clone https://github.com/sdc-ren/cc-notify-telegram.git
+cd cc-notify-telegram
+npm test        # node --test, không cần cài dependency
+```
+
+Hãy thêm/cập nhật test khi đổi hành vi. CI chạy trên Ubuntu, macOS, Windows với Node 18 và 22. Báo lỗ hổng bảo mật qua GitHub private security advisory, không mở issue công khai.
+
+## Giấy phép
+
+[MIT](LICENSE) © sdc-ren

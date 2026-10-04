@@ -6,9 +6,27 @@
 
 **Let your AI coding agent work while you step away.** Get Telegram pings when a task finishes, answer the agent's questions from your phone, and approve or deny tool permissions with a tap.
 
-Works with **Claude Code**, **OpenAI Codex** and **Google Antigravity**. No server, no webhook, no extra dependencies. It only uses the Telegram Bot API and each agent's own hook system.
+Works with **Claude Code**, **OpenAI Codex** and **Google Antigravity**. No server, no webhook, no extra dependencies: it only uses the Telegram Bot API and each agent's own hook system.
 
-[Tiếng Việt](README.vi.md)
+🌐 English · [Tiếng Việt](README.vi.md)
+
+## Table of contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Installation](#installation)
+  - [1. Create a Telegram bot](#1-create-a-telegram-bot)
+  - [2. Run the installer](#2-run-the-installer)
+  - [3. Set up a short command (optional)](#3-set-up-a-short-command-optional)
+- [Usage](#usage)
+- [How it works](#how-it-works)
+- [CLI reference](#cli-reference)
+- [Configuration](#configuration)
+- [Troubleshooting](#troubleshooting)
+- [Security](#security)
+- [Uninstall](#uninstall)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
@@ -20,7 +38,7 @@ Works with **Claude Code**, **OpenAI Codex** and **Google Antigravity**. No serv
 
 Safety model: **fail-closed and fail-safe.** An empty allowlist means nobody can approve remotely. Network errors, Telegram errors and timeouts fall back to the normal prompt on your machine. Nothing is ever auto-approved.
 
-### What it looks like
+What it looks like:
 
 ```
 ✅ [Codex · packflow]
@@ -42,12 +60,14 @@ Every message carries an `[Agent · Project · Session]` tag so replies always r
 
 ## Requirements
 
-- Node.js **18.17+**
+- Node.js **18.17+** and `git` (the package is installed from GitHub)
 - At least one of: Claude Code, OpenAI Codex, Google Antigravity
 - A Telegram bot (free, about a minute to create)
 - macOS, Linux or Windows (CI runs on all three)
 
-## Quick start
+## Installation
+
+> **The package is not published on npm yet**, so `npx cc-notify-telegram` returns a 404. Everything below runs straight from GitHub.
 
 ### 1. Create a Telegram bot
 
@@ -55,13 +75,13 @@ Every message carries an `[Agent · Project · Session]` tag so replies always r
 2. Add the bot to the group where you want notifications (a private chat with the bot also works).
 3. In the group, mention the bot or reply to one of its messages once, so the bot can see the chat. Bots have *privacy mode* on by default; this tool works with it, you do not need to turn it off.
 
-### 2. Install
+### 2. Run the installer
 
 ```bash
 npx -y github:sdc-ren/cc-notify-telegram
 ```
 
-The wizard will:
+The first run downloads the repo, so it can take a few seconds. The wizard will:
 
 1. let you pick which agents to install for (Claude Code, Codex, Antigravity),
 2. validate your bot token with `getMe`,
@@ -82,43 +102,58 @@ npx -y github:sdc-ren/cc-notify-telegram init \
 # --allow-user 111222333 --allow-user 444555666   (also enables Remote Permission)
 ```
 
-### Running commands (npx from GitHub)
+To pin a version, append a branch, tag or commit: `github:sdc-ren/cc-notify-telegram#main` or `#<commit-sha>`.
 
-The package is **not published on npm yet**, so `npx cc-notify-telegram` returns a 404. Run it straight from GitHub instead:
+### 3. Set up a short command (optional)
 
-```bash
-npx -y github:sdc-ren/cc-notify-telegram <command>
-# e.g.
-npx -y github:sdc-ren/cc-notify-telegram status
-npx -y github:sdc-ren/cc-notify-telegram remote on claude
-```
+Typing `npx -y github:sdc-ren/cc-notify-telegram ...` every time gets old. Pick **one** of the options below. The hooks the installer registers do **not** depend on this step; it only makes the CLI (`status`, `remote on`, ...) easier to call.
 
-The first run downloads the repo, so it can take a few seconds. To pin a version, append a branch, tag or commit: `github:sdc-ren/cc-notify-telegram#main` or `#<commit-sha>`.
-
-Prefer a short command? Install it globally once, then drop the `npx` prefix:
+**Option A: global install (recommended).** Creates real `cc-notify-telegram` and `ai-notify-telegram` commands that work in any shell, with no rc-file edits.
 
 ```bash
 npm i -g github:sdc-ren/cc-notify-telegram
-cc-notify-telegram status        # or: ai-notify-telegram status
+cc-notify-telegram status
 ```
 
-All later examples in this README use `npx -y github:sdc-ren/cc-notify-telegram`; with the global install, replace it with `cc-notify-telegram`.
+To update, run the same command again. To remove it, `npm rm -g cc-notify-telegram`.
 
-### 3. Turn on remote features
+**Option B: shell alias.** Always runs the latest GitHub version and needs no global install. Add one line to your shell config, then restart the shell (or `source` the file):
+
+| Shell | File | Line to add |
+|---|---|---|
+| zsh | `~/.zshrc` | `alias cc-notify='npx -y github:sdc-ren/cc-notify-telegram'` |
+| bash | `~/.bashrc` (macOS: `~/.bash_profile`) | `alias cc-notify='npx -y github:sdc-ren/cc-notify-telegram'` |
+| fish | run once: `alias --save cc-notify 'npx -y github:sdc-ren/cc-notify-telegram'` | |
+| PowerShell | `$PROFILE` | `function cc-notify { npx -y github:sdc-ren/cc-notify-telegram @args }` |
+
+Then use it like this:
+
+```bash
+cc-notify status
+cc-notify remote on claude
+```
+
+An alias is only available in interactive shells, not in scripts or CI. In those, use the full `npx -y github:...` form or Option A.
+
+> **Convention in this README.** Examples are written as `cc-notify-telegram <command>`. If you did not set up a short command, use `npx -y github:sdc-ren/cc-notify-telegram <command>`; with the Option B alias, use `cc-notify <command>`.
+>
+> The installed hook is a *copy* in `~/.claude/hooks/`. After you update the CLI, re-run `cc-notify-telegram init` to refresh it.
+
+## Usage
 
 Completion pings work right after install. Remote Ask and Remote Permission are opt-in:
 
 ```bash
-npx -y github:sdc-ren/cc-notify-telegram remote on          # Remote Ask
-npx -y github:sdc-ren/cc-notify-telegram remote-perm on     # Remote Permission (needs allowedUserIds)
+cc-notify-telegram remote on          # Remote Ask
+cc-notify-telegram remote-perm on     # Remote Permission (needs allowedUserIds)
 ```
 
 > **Important: `remote-perm` requires `remote` to be on.** Permission and plan notifications are only sent when the global *and* per-agent `remote` switch is on. If `status` shows `Remote Ask: off`, you will get no permission or plan messages even with Remote Permission enabled. See [Troubleshooting](#troubleshooting).
 
-Check everything with:
+Restart your agent session after changing switches, then check everything:
 
 ```bash
-npx -y github:sdc-ren/cc-notify-telegram status
+cc-notify-telegram status
 ```
 
 ## How it works
@@ -157,7 +192,7 @@ Codex client ──JSON-RPC──▶ cc-notify-telegram codex-bridge ──JSON-
 
 If Telegram times out, or you reply/choose `local`, the request goes back to the local client. For `item/permissions/requestApproval`, Deny is mapped to an empty grant because the App Server schema has no separate decline decision for it.
 
-## CLI
+## CLI reference
 
 `cc-notify-telegram` and `ai-notify-telegram` are the same binary.
 
@@ -206,10 +241,10 @@ If a topic ID is wrong or the topic was deleted, messages fall back to the main 
 
 ## Troubleshooting
 
-- **I only get "task finished" messages, no permission or plan messages.** Run `npx -y github:sdc-ren/cc-notify-telegram status`. Permission and plan notices need `remote` **and** `remote-perm` on, and `allowedUserIds` non-empty:
+- **I only get "task finished" messages, no permission or plan messages.** Run `cc-notify-telegram status`. Permission and plan notices need `remote` **and** `remote-perm` on, and `allowedUserIds` non-empty:
   ```bash
-  npx -y github:sdc-ren/cc-notify-telegram remote on claude
-  npx -y github:sdc-ren/cc-notify-telegram remote-perm on claude
+  cc-notify-telegram remote on claude
+  cc-notify-telegram remote-perm on claude
   ```
   Restart the agent session afterwards so it re-reads the hooks. Claude Code only shows a permission dialog for tools not already allowed in your `settings.json` or by your permission mode, so a tool you pre-approved (or a bypass-permissions mode) never produces a request.
 - **`group chat was upgraded to a supergroup chat`.** Telegram migrated the group. Put the new `-100…` ID (returned as `migrate_to_chat_id`) into `chatId`, then run `test`.
@@ -226,8 +261,8 @@ If a topic ID is wrong or the topic was deleted, messages fall back to the main 
 ## Uninstall
 
 ```bash
-npx -y github:sdc-ren/cc-notify-telegram uninstall          # remove hooks, keep config
-npx -y github:sdc-ren/cc-notify-telegram uninstall --purge  # remove everything
+cc-notify-telegram uninstall          # remove hooks, keep config
+cc-notify-telegram uninstall --purge  # remove everything
 ```
 
 ## Contributing
