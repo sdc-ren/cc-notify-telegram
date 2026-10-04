@@ -318,11 +318,11 @@ export async function runInit(flags, { home = homedir(), log = console.log } = {
 
     log('');
     log('🎉 Xong! Mở session Claude Code MỚI để CLAUDE.md được nạp.');
-    log('   • Bật trả lời câu hỏi qua Telegram khi ra ngoài:  npx cc-notify-telegram remote on');
+    log('   • Bật trả lời câu hỏi qua Telegram khi ra ngoài:  npx -y github:sdc-ren/cc-notify-telegram remote on');
     if (remotePermission) {
-      log('   • Bật/tắt duyệt quyền từ xa:                      npx cc-notify-telegram remote-perm on|off');
+      log('   • Bật/tắt duyệt quyền từ xa:                      npx -y github:sdc-ren/cc-notify-telegram remote-perm on|off');
     }
-    log('   • Kiểm tra sức khoẻ:                              npx cc-notify-telegram status');
+    log('   • Kiểm tra sức khoẻ:                              npx -y github:sdc-ren/cc-notify-telegram status');
     return isInstalled(merged);
   } finally {
     rl?.close();

@@ -31,7 +31,7 @@ export async function runStatus({ home = homedir(), log = console.log } = {}) {
       add(mode === 0o600, `Quyền config ${mode.toString(8)} (nên 600)`, 'chmod 600 file config');
     }
   } else {
-    add(false, 'Config thiếu botToken/chatId', 'chạy: npx cc-notify-telegram init');
+    add(false, 'Config thiếu botToken/chatId', 'chạy: npx -y github:sdc-ren/cc-notify-telegram init');
   }
 
   // Token sống?
@@ -99,7 +99,7 @@ export async function runStatus({ home = homedir(), log = console.log } = {}) {
   } else if (!cfg.allowedUserIds.length) {
     add(false, 'Remote Permission: ON nhưng allowedUserIds RỖNG', 'không ai duyệt được — chạy lại init để thêm user ID');
   } else if (!cfg.remote) {
-    add(false, `Remote Permission: ON (${cfg.allowedUserIds.length} user) nhưng Remote Ask đang off`, 'chạy: npx cc-notify-telegram remote on');
+    add(false, `Remote Permission: ON (${cfg.allowedUserIds.length} user) nhưng Remote Ask đang off`, 'chạy: npx -y github:sdc-ren/cc-notify-telegram remote on');
   } else {
     add(true, `Remote Permission: ON — ${cfg.allowedUserIds.length} user được duyệt, "cho phép tất cả" tối đa ${cfg.sessionAllowTtlMin}′`);
   }

@@ -91,7 +91,7 @@ export async function runRemote(
   }
   const config = readConfig(home);
   if (!config) {
-    log('Chưa có config — chạy: npx cc-notify-telegram init');
+    log('Chưa có config — chạy: npx -y github:sdc-ren/cc-notify-telegram init');
     return false;
   }
   const enabling = mode === 'on';
@@ -118,11 +118,11 @@ export async function runRemote(
   if (key === 'remotePermission' && enabling) {
     if (!(config.allowedUserIds || []).length) {
       log('⚠️  Chưa có allowedUserIds — KHÔNG ai duyệt được từ xa (fail-closed).');
-      log('    Chạy `npx cc-notify-telegram init` để dò/thêm user ID được phép duyệt.');
+      log('    Chạy `npx -y github:sdc-ren/cc-notify-telegram init` để dò/thêm user ID được phép duyệt.');
     }
     const missingRemote = targetProviders.filter((id) => !isToggleEnabled(config, 'remote', id));
     if (missingRemote.length) {
-      log('⚠️  Remote Ask đang TẮT — bật luôn bằng `npx cc-notify-telegram remote on`.');
+      log('⚠️  Remote Ask đang TẮT — bật luôn bằng `npx -y github:sdc-ren/cc-notify-telegram remote on`.');
     }
   }
 
