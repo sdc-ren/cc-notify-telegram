@@ -50,22 +50,22 @@ export function parseArgs(argv) {
 const HELP = `cc-notify-telegram — AI agents ↔ Telegram
 
 Cách dùng:
-  npx cc-notify-telegram [init]     Wizard cài đặt (token, chat ID, hooks, CLAUDE.md)
-  npx cc-notify-telegram test       Gửi tin test
-  npx cc-notify-telegram status     Kiểm tra sức khoẻ toàn chuỗi notify
-  npx cc-notify-telegram remote on  Bật Remote Ask (trả lời câu hỏi của Claude qua Telegram)
-  npx cc-notify-telegram remote off Tắt Remote Ask (câu hỏi hiện tại máy)
-  npx cc-notify-telegram remote on codex
+  npx -y github:sdc-ren/cc-notify-telegram [init]     Wizard cài đặt (token, chat ID, hooks, CLAUDE.md)
+  npx -y github:sdc-ren/cc-notify-telegram test       Gửi tin test
+  npx -y github:sdc-ren/cc-notify-telegram status     Kiểm tra sức khoẻ toàn chuỗi notify
+  npx -y github:sdc-ren/cc-notify-telegram remote on  Bật Remote Ask (trả lời câu hỏi của Claude qua Telegram)
+  npx -y github:sdc-ren/cc-notify-telegram remote off Tắt Remote Ask (câu hỏi hiện tại máy)
+  npx -y github:sdc-ren/cc-notify-telegram remote on codex
                                     Bật Remote Ask riêng cho provider
-  npx cc-notify-telegram remote-perm on|off
+  npx -y github:sdc-ren/cc-notify-telegram remote-perm on|off
                                     Bật/tắt Remote Permission (duyệt hộp thoại quyền bằng
                                     nút bấm Telegram — chỉ allowedUserIds mới bấm được)
-  npx cc-notify-telegram remote-perm on antigravity
+  npx -y github:sdc-ren/cc-notify-telegram remote-perm on antigravity
                                     Bật/tắt Remote Permission riêng cho provider
-  npx cc-notify-telegram codex-bridge
+  npx -y github:sdc-ren/cc-notify-telegram codex-bridge
                                     Stdio proxy cho Codex App Server; intercept
                                     item/tool/requestUserInput qua Telegram
-  npx cc-notify-telegram uninstall  Gỡ hooks (--purge: xoá cả config/token + CLAUDE.md block)
+  npx -y github:sdc-ren/cc-notify-telegram uninstall  Gỡ hooks (--purge: xoá cả config/token + CLAUDE.md block)
 
 Cờ cho init (non-interactive):
   --token <bot-token> --chat-id <id> [--thread-id <n>] [--lang vi|en]
@@ -94,7 +94,7 @@ async function main() {
     case 'test': {
       const cfg = loadConfig();
       if (!hasCredentials(cfg)) {
-        console.log('Chưa có config — chạy: npx cc-notify-telegram init');
+        console.log('Chưa có config — chạy: npx -y github:sdc-ren/cc-notify-telegram init');
         return false;
       }
       await makeTelegram(cfg).sendMessage(strings(cfg).testMessage);

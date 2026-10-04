@@ -13,7 +13,8 @@
     "hook/",
     "snippets/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "README.vi.md"
   ],
   "scripts": {
     "test": "node --test"
@@ -27,12 +28,20 @@
     "telegram",
     "notification",
     "hooks",
-    "remote-ask"
+    "remote-ask",
+    "codex",
+    "antigravity",
+    "ai-agent",
+    "remote-approval"
   ],
-  "author": "dangchison",
+  "author": "sdc-ren",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dangchison/cc-notify-telegram.git"
+    "url": "git+https://github.com/sdc-ren/cc-notify-telegram.git"
+  },
+  "homepage": "https://github.com/sdc-ren/cc-notify-telegram#readme",
+  "bugs": {
+    "url": "https://github.com/sdc-ren/cc-notify-telegram/issues"
   }
 }
