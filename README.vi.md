@@ -268,6 +268,25 @@ trả decision allow/deny về Agent → lệnh chạy / bị chặn
    └─▶ tin đổi thành "✅ Đã cho phép (Sơn)" và bàn phím nút biến mất
 ```
 
+
+**Duyệt / góp ý plan (Claude Code).** Khi Claude gọi `ExitPlanMode`, toàn bộ plan được gửi lên Telegram kèm nút:
+
+```
+📋 [Claude · proj · c3d4] Claude Code có plan cần bạn duyệt:
+
+<nội dung plan>
+
+   [ ✅ Duyệt (hỏi từng bước) ]
+   [ ✅ Duyệt + tự sửa file ]
+   [ ✏️ Chưa ổn ]  [ 🖥 Để máy xử lý ]
+```
+
+- **Duyệt** thoát plan mode và bắt đầu làm. "Duyệt + tự sửa file" còn chuyển session sang `acceptEdits`.
+- **Review / yêu cầu sửa:** *reply vào tin plan* với góp ý của bạn. Claude giữ nguyên plan mode, sửa plan rồi trình lại. Nút "Chưa ổn" cũng vậy nhưng không kèm góp ý.
+- Chỉ `allowedUserIds` mới bấm nút hoặc góp ý được. Nếu bạn reply `local`, hết giờ chờ, hoặc không đọc được nội dung plan thì hộp thoại plan vẫn hiện tại máy như bình thường.
+
+> Tính năng này dựa vào việc hook `PermissionRequest` của Claude Code hoạt động với `ExitPlanMode` như tài liệu mô tả. Nếu phiên bản của bạn bỏ qua quyết định của hook, hộp thoại vẫn hiện tại máy nên không mất gì; hãy mở issue kèm `claude --version`.
+
 ---
 
 ## Lệnh CLI
