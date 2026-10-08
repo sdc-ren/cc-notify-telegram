@@ -200,6 +200,7 @@ answer returned to the agent → it continues
 - **Approve** leaves plan mode and starts the work. "Approve + auto-accept edits" also switches the session to `acceptEdits`.
 - **Review / request changes:** *reply to the plan message* with your feedback. Claude stays in plan mode, revises the plan and presents it again. "Not yet" does the same without feedback.
 - Want the whole plan text instead? Set `"planDetail": "full"` (or `CC_NOTIFY_PLAN_DETAIL=full`).
+- If you approve or cancel at the machine instead, the Telegram message is closed automatically ("handled at the machine or cancelled") and its buttons disappear. Tapping an old button shows a short "request closed" notice.
 - Only `allowedUserIds` can press buttons or send feedback. If you reply `local`, the wait times out, or the plan text is unavailable, the normal plan dialog appears on your machine.
 
 > Plan review relies on Claude Code's `PermissionRequest` hook for `ExitPlanMode`. It was verified end to end on Claude Code 2.1.287. If your version ignores the hook's decision, the dialog still shows locally, so nothing is lost; please open an issue with your `claude --version`.

@@ -290,6 +290,7 @@ trả decision allow/deny về Agent → lệnh chạy / bị chặn
 - **Duyệt** thoát plan mode và bắt đầu làm. "Duyệt + tự sửa file" còn chuyển session sang `acceptEdits`.
 - **Review / yêu cầu sửa:** *reply vào tin plan* với góp ý của bạn. Claude giữ nguyên plan mode, sửa plan rồi trình lại. Nút "Chưa ổn" cũng vậy nhưng không kèm góp ý.
 - Muốn nhận nguyên văn plan? Đặt `"planDetail": "full"` (hoặc `CC_NOTIFY_PLAN_DETAIL=full`).
+- Nếu bạn duyệt hoặc hủy ngay tại máy, tin Telegram tự đóng ("đã xử lý tại máy hoặc đã hủy") và nút biến mất. Bấm vào nút cũ sẽ hiện thông báo ngắn "yêu cầu đã đóng".
 - Chỉ `allowedUserIds` mới bấm nút hoặc góp ý được. Nếu bạn reply `local`, hết giờ chờ, hoặc không đọc được nội dung plan thì hộp thoại plan vẫn hiện tại máy như bình thường.
 
 > Tính năng này dựa vào hook `PermissionRequest` của Claude Code cho `ExitPlanMode`, đã kiểm chứng end-to-end trên Claude Code 2.1.287. Nếu phiên bản của bạn bỏ qua quyết định của hook, hộp thoại vẫn hiện tại máy nên không mất gì; hãy mở issue kèm `claude --version`.

@@ -13,6 +13,7 @@ import {
   buildStopMessage,
   chunkMessage,
   classifyUpdate,
+  closeOnSignal,
   condensePlan,
   denyOutput,
   describePermission,
@@ -445,11 +446,12 @@ test('classifyUpdate: bấm nút hợp lệ → callback kèm fromId (để ki�
   });
 });
 
-test('classifyUpdate: bấm nút sai chat / tin lạ / data lạ → ignore', () => {
+test('classifyUpdate: bấm nút sai chat / data lạ → ignore; nút của tin đã đóng → stale-callback', () => {
   const ctx = { chatId: '-100', pending: [{ kind: 'perm', messageId: 10, sentAt: 1 }] };
   const sameShape = (over) => classifyUpdate(callbackUpdate(over), ctx).kind;
   assert.equal(sameShape({ message: { message_id: 10, chat: { id: -999 } } }), 'ignore');
-  assert.equal(sameShape({ message: { message_id: 11, chat: { id: -100 } } }), 'ignore');
+  // tin lạ (không còn pending) với data hợp lệ = nút của yêu cầu đã đóng → 'stale-callback'
+  assert.equal(sameShape({ message: { message_id: 11, chat: { id: -100 } } }), 'stale-callback');
   assert.equal(sameShape({ data: 'zzz' }), 'ignore');
   assert.equal(sameShape({ data: '' }), 'ignore');
 });
@@ -801,4 +803,65 @@ test('runPlan: không đọc được nội dung plan → chỉ báo, KHÔNG nú
   assert.equal(h.sent.length, 1);
   assert.equal(h.sent[0].opts.reply_markup, undefined);
   assert.match(h.sent[0].text, /có plan cần bạn duyệt/);
+});
+
+// --- Tin Telegram không được treo nút khi người dùng xử lý tại máy ---
+
+test('closeOnSignal: tín hiệu → chạy onClose rồi exit(0); gỡ handler thì không chạy nữa', async () => {
+  let closed = 0;
+  const exits = [];
+  const baseline = process.listenerCount('SIGUSR2');
+  const stop = closeOnSignal(async () => { closed++; }, { signals: ['SIGUSR2'], exit: (c) => exits.push(c) });
+  process.emit('SIGUSR2');
+  process.emit('SIGUSR2'); // bắn lần 2 không chạy lại
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(closed, 1);
+  assert.deepEqual(exits, [0]);
+  stop();
+  assert.equal(process.listenerCount('SIGUSR2'), baseline);
+});
+
+test('closeOnSignal: onClose lỗi vẫn exit(0)', async () => {
+  const exits = [];
+  const stop = closeOnSignal(async () => { throw new Error('mạng lỗi'); }, { signals: ['SIGUSR2'], exit: (c) => exits.push(c) });
+  process.emit('SIGUSR2');
+  await new Promise((r) => setTimeout(r, 20));
+  assert.deepEqual(exits, [0]);
+  stop();
+});
+
+test('stale-callback: nút của plan đã đóng → tooltip báo + gỡ bàn phím (qua poller đang chạy)', async () => {
+  const h = planHarness({ updates: [] });
+  const answered = [];
+  const cleared = [];
+  let n = 0;
+  h.tg.answerCallbackQuery = async (id, extra) => answered.push({ id, extra });
+  h.tg.clearKeyboard = async (id) => cleared.push(id);
+  h.tg.getUpdates = async () => {
+    n++;
+    // 1: bấm nút của tin 555 (không còn pending) · 2: bấm nút thật của plan đang chờ
+    if (n === 1) return [{ update_id: 1, callback_query: { id: 'old', data: 'a:deadbeefdeadbeef', from: { id: 111 }, message: { chat: { id: 7 }, message_id: 555 } } }];
+    return [cb(2, `l:${keyOf(h)}`)];
+  };
+  assert.equal(await h.run(), null);
+  assert.match(answered[0].extra.text, /đã đóng/);
+  assert.equal(answered[0].extra.show_alert, true);
+  assert.deepEqual(cleared, [555]);
+});
+
+test('stale-callback: người ngoài allowlist bấm nút cũ → im lặng', async () => {
+  const h = planHarness({ updates: [] });
+  const answered = [];
+  let n = 0;
+  h.tg.answerCallbackQuery = async (id, extra) => answered.push({ id, extra });
+  h.tg.clearKeyboard = async () => answered.push('cleared');
+  h.tg.getUpdates = async () => {
+    n++;
+    if (n === 1) return [{ update_id: 1, callback_query: { id: 'x', data: 'a:deadbeefdeadbeef', from: { id: 999 }, message: { chat: { id: 7 }, message_id: 555 } } }];
+    return [cb(2, `l:${keyOf(h)}`)];
+  };
+  await h.run();
+  // chỉ còn lần bấm nút thật (tắt spinner, extra rỗng); không có tooltip cho người lạ, không gỡ bàn phím
+  assert.ok(!answered.includes('cleared'));
+  assert.ok(answered.every((a) => a.extra && !a.extra.show_alert));
 });
