@@ -14,7 +14,9 @@ import {
   chunkMessage,
   classifyUpdate,
   closeOnSignal,
+  buildPlanQuestionsMessage,
   condensePlan,
+  extractOpenQuestions,
   denyOutput,
   describePermission,
   extractDoneSummary,
@@ -618,20 +620,20 @@ test('condensePlan: heading kiểu "### Bước 1: …" và plan không có cấ
   assert.deepEqual(condensePlan('Chỉ là một đoạn văn.').steps, []);
 });
 
-test('buildPlanMessage (mặc định summary): ngắn hơn bản đầy đủ, có ghi chú tóm tắt, không còn đường dẫn/bối cảnh', () => {
+test('buildPlanMessage (mặc định summary): ngắn hơn bản đầy đủ, không còn đường dẫn/bối cảnh, KHÔNG bắt về máy xem', () => {
   const summary = buildPlanMessage({ plan: LONG_PLAN, project: 'shop', suffix: 'ab12', str, providerId: 'claude' });
   const full = buildPlanMessage({ plan: LONG_PLAN, project: 'shop', suffix: 'ab12', str, providerId: 'claude', detail: 'full' });
   assert.ok(summary.length < full.length / 2);
   assert.match(summary, /📌 Thêm báo cáo doanh thu/);
   assert.match(summary, /1\. Tạo bảng daily_sales/);
-  assert.match(summary, /Bản tóm tắt/);
+  assert.doesNotMatch(summary, /tại máy|at the machine/);
   assert.doesNotMatch(summary, /bối cảnh|route\.ts|\.sql|Kiểm chứng/);
 });
 
-test('buildPlanMessage summary: plan không có cấu trúc → fallback đoạn đầu đã làm sạch; quá nhiều bước → "+N"', () => {
+test('buildPlanMessage summary: plan không có cấu trúc → fallback đoạn đầu đã làm sạch; quá 30 bước → "+N"', () => {
   const free = buildPlanMessage({ plan: 'Sửa **file** src/a/b/c.ts và thêm test.', project: 'p', suffix: '', str, providerId: 'claude' });
   assert.match(free, /Sửa và thêm test/);
-  const many = '## Steps\n' + Array.from({ length: 11 }, (_, i) => `- Việc số ${i + 1}`).join('\n');
+  const many = '## Steps\n' + Array.from({ length: 33 }, (_, i) => `- Việc số ${i + 1}`).join('\n');
   assert.match(buildPlanMessage({ plan: many, project: 'p', suffix: '', str, providerId: 'claude' }), /… \+3 bước nữa/);
 });
 
@@ -864,4 +866,100 @@ test('stale-callback: người ngoài allowlist bấm nút cũ → im lặng', a
   // chỉ còn lần bấm nút thật (tắt spinner, extra rỗng); không có tooltip cho người lạ, không gỡ bàn phím
   assert.ok(!answered.includes('cleared'));
   assert.ok(answered.every((a) => a.extra && !a.extra.show_alert));
+});
+
+// --- Câu hỏi mở + liệt kê đủ các bước, bỏ việc "sửa file nào" ---
+
+const PLAN_WITH_QUESTIONS = [
+  '# Plan: Báo cáo doanh thu',
+  '## Các bước',
+  '1. Dựng bảng doanh thu theo ngày',
+  '2. Viết API trả về tổng theo ngày',
+  '3. Làm trang biểu đồ',
+  '',
+  '## Câu hỏi mở',
+  '1. Doanh thu tính theo giờ UTC hay giờ cửa hàng?',
+  '   - A: UTC',
+  '   - B: giờ cửa hàng',
+  '2. Có cần xuất Excel không?',
+  '',
+  '## Phạm vi thay đổi',
+  '- app/api/reports/route.ts',
+  '- app/(admin)/reports/page.tsx',
+].join('\n');
+
+test('extractOpenQuestions: lấy NGUYÊN VĂN mục câu hỏi mở (kèm phương án con); không có / "Không có" → rỗng', () => {
+  const q = extractOpenQuestions(PLAN_WITH_QUESTIONS);
+  assert.match(q, /1\. Doanh thu tính theo giờ UTC hay giờ cửa hàng\?/);
+  assert.match(q, /- A: UTC/);
+  assert.match(q, /2\. Có cần xuất Excel không\?/);
+  assert.doesNotMatch(q, /route\.ts|Các bước/);
+  assert.equal(extractOpenQuestions(LONG_PLAN), '');
+  assert.equal(extractOpenQuestions('# P\n## Open questions\nNone\n## Steps\n- a b c'), '');
+  assert.equal(extractOpenQuestions('# P\n## Câu hỏi mở\n- Không có\n'), '');
+});
+
+test('condensePlan: câu hỏi mở và phạm vi thay đổi KHÔNG lọt vào các bước; bước chỉ-sửa-file bị bỏ', () => {
+  const { steps } = condensePlan(PLAN_WITH_QUESTIONS);
+  assert.deepEqual(steps, ['Dựng bảng doanh thu theo ngày', 'Viết API trả về tổng theo ngày', 'Làm trang biểu đồ']);
+  const fileOnly = condensePlan('## Các bước\n1. Sửa `src/a.ts`\n2. Cập nhật `docs/guide.md`\n3. Thêm kiểm tra đầu vào cho form');
+  assert.deepEqual(fileOnly.steps, ['Thêm kiểm tra đầu vào cho form']);
+});
+
+test('condensePlan: liệt kê HẾT các bước (không cắt ở 8)', () => {
+  const plan = '## Các bước\n' + Array.from({ length: 15 }, (_, i) => `${i + 1}. Làm việc quan trọng số ${i + 1}`).join('\n');
+  assert.equal(condensePlan(plan).steps.length, 15);
+});
+
+test('buildPlanQuestionsMessage: có tag, đủ câu hỏi, hướng dẫn reply', () => {
+  const msg = buildPlanQuestionsMessage({ questions: extractOpenQuestions(PLAN_WITH_QUESTIONS), project: 'shop', suffix: 'ab12', str, providerId: 'claude' });
+  assert.match(msg, /^❓ \[Claude · shop · ab12\]/);
+  assert.match(msg, /- B: giờ cửa hàng/);
+  assert.match(msg, /REPLY/);
+});
+
+test('runPlan có câu hỏi mở: reply → deny kèm câu trả lời nguyên văn; KHÔNG gửi bản tóm tắt bước', async () => {
+  const h = planHarness({ updates: [], plan: PLAN_WITH_QUESTIONS });
+  h.tg.getUpdates = async () => [
+    {
+      update_id: 1,
+      message: { chat: { id: 7, type: 'supergroup' }, text: '1A, 2: không', date: Math.floor(Date.now() / 1000), from: { id: 111, first_name: 'Sơn' }, reply_to_message: { message_id: 101 } },
+    },
+  ];
+  const out = JSON.parse(await h.run()).hookSpecificOutput.decision;
+  assert.equal(out.behavior, 'deny');
+  assert.match(out.message, /1A, 2: không/);
+  assert.match(out.message, /BỎ mục câu hỏi mở/);
+  assert.match(h.sent[0].text, /^❓/);
+  assert.doesNotMatch(h.sent[0].text, /Dựng bảng doanh thu/);
+  assert.deepEqual(h.sent[0].opts.reply_markup.inline_keyboard.flat().map((b) => b.callback_data.split(':')[0]).sort(), ['c', 'l']);
+});
+
+test('runPlan có câu hỏi mở: "Claude tự quyết" → deny; "Để máy xử lý" → null', async () => {
+  const h = planHarness({ updates: [], plan: PLAN_WITH_QUESTIONS });
+  h.tg.getUpdates = async () => [cb(1, `c:${keyOf(h)}`)];
+  const out = JSON.parse(await h.run()).hookSpecificOutput.decision;
+  assert.equal(out.behavior, 'deny');
+  assert.match(out.message, /TỰ QUYẾT/);
+
+  const h2 = planHarness({ updates: [], plan: PLAN_WITH_QUESTIONS });
+  h2.tg.getUpdates = async () => [cb(1, `l:${keyOf(h2)}`)];
+  assert.equal(await h2.run(), null);
+});
+
+test('runPlan: plan không còn câu hỏi mở → luồng duyệt bình thường (tóm tắt các bước + 4 nút)', async () => {
+  const h = planHarness({ updates: [], plan: LONG_PLAN });
+  h.tg.getUpdates = async () => [cb(1, `a:${keyOf(h)}`)];
+  assert.equal(JSON.parse(await h.run()).hookSpecificOutput.decision.behavior, 'allow');
+  assert.match(h.sent[0].text, /^📋/);
+  assert.match(h.sent[0].text, /1\. Tạo bảng daily_sales/);
+});
+
+test('extractOpenQuestions: mục "Quyết định cần chốt" / "Decisions needed" cũng được hỏi; "quyết định thiết kế" thì không', () => {
+  assert.match(extractOpenQuestions('# P\n## Các bước\n1. A b c\n## Quyết định cần chốt\n- Dùng Postgres hay SQLite?\n'), /Postgres hay SQLite/);
+  assert.match(extractOpenQuestions('# P\n## Decisions needed\n1. Which auth provider?\n'), /Which auth provider/);
+  assert.match(extractOpenQuestions('# P\n## TBD\n- retention period\n'), /retention period/);
+  assert.equal(extractOpenQuestions('# P\n## Quyết định thiết kế\n- Đã chọn Postgres vì ổn định\n'), '');
+  // và không lọt vào danh sách bước
+  assert.deepEqual(condensePlan('## Các bước\n1. Làm việc một\n## Quyết định cần chốt\n- Dùng Postgres hay SQLite?\n').steps, ['Làm việc một']);
 });

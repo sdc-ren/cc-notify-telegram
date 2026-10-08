@@ -22,3 +22,8 @@ question) — end your message with a line starting with `🛑` briefly describi
 must do, plus the marker `<!-- CC_NOTIFY_ESCALATE -->` on its own line.
 
 Also use ESCALATE when you stop to **wait for the user to choose a direction or confirm something** (e.g. "which option?", "commit and push now?", "need QC input") — the Stop hook sends nothing without a marker, so the user would never know you are waiting. Keep it to one short `🛑` line saying what you need.
+
+When writing a plan (plan mode), keep the Telegram message short but complete:
+- Open questions or decisions that need settling: ask **right away** — ask them with `AskUserQuestion` **BEFORE** calling `ExitPlanMode`; do not leave an "Open questions" or "Decisions needed" section in the plan you present.
+- Write a `## Steps` section listing **all** main steps, **one short sentence each** describing the outcome (no file names).
+- Put the concrete file list / changes under `## Scope of changes` — that section is **not** sent to Telegram.
