@@ -1184,7 +1184,9 @@ const PLAN_STEP_HEADING = /bước|cách làm|step|implementation|approach|thự
 const PLAN_SKIP_HEADING =
   /context|bối cảnh|file|phạm vi|scope|thay đổi|changes?|critical|kiểm chứng|verif|test|out of scope|rủi ro|risk|ghi chú|note|lưu ý|why|vì sao|tóm tắt|summary/i;
 // Mục câu hỏi mở: phải được hỏi (đầy đủ) trước khi dựng lại plan.
-const PLAN_QUESTION_HEADING = /câu hỏi|open question|questions?|cần làm rõ|chưa rõ|clarif|unresolved|cần xác nhận|điểm mở/i;
+// (gồm cả "quyết định cần chốt" / "decisions needed"; KHÔNG khớp "quyết định thiết kế" đã chốt sẵn.)
+const PLAN_QUESTION_HEADING =
+  /câu hỏi|open question|questions?|cần làm rõ|chưa rõ|clarif|unresolved|cần xác nhận|điểm mở|quyết định cần|cần quyết định|cần chốt|chưa chốt|cần bạn (?:chọn|quyết)|decisions? (?:needed|to (?:be )?(?:made|decided|confirmed?))|needs? decision|to decide|undecided|tbd|pending decision/i;
 const PLAN_NO_QUESTIONS = /^(?:[-*+•\s]*)(?:không(?: có)?|chưa có|none|n\/a|no(?:ne)?|nothing|—|-)\.?\s*$/i;
 const PLAN_FILE_EXT = 'mjs|cjs|js|jsx|ts|tsx|json|md|py|sh|yml|yaml|css|html|toml|sql|vue|go|rs|java|rb|php|lock|env';
 // Đường dẫn file/thư mục (có đuôi file, bắt đầu ~/ ./ ../, thư mục kết thúc /, hoặc >= 2 cấp).

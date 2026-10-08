@@ -288,7 +288,7 @@ trả decision allow/deny về Agent → lệnh chạy / bị chặn
 
 - **Duyệt** thoát plan mode và bắt đầu làm. "Duyệt + tự sửa file" còn chuyển session sang `acceptEdits`.
 - **Review / yêu cầu sửa:** *reply vào tin plan* với góp ý của bạn. Claude giữ nguyên plan mode, sửa plan rồi trình lại. Nút "Chưa ổn" cũng vậy nhưng không kèm góp ý.
-- **Câu hỏi mở được hỏi trước.** Nếu plan còn mục "Câu hỏi mở", Telegram nhận các câu hỏi đó đầy đủ (reply câu trả lời, hoặc bấm *Claude tự quyết*). Claude dựng lại plan không còn câu hỏi, rồi danh sách các bước mới được gửi. Snippet `CLAUDE.md` cũng dặn Claude hỏi những câu này bằng `AskUserQuestion` trước khi trình plan.
+- **Câu hỏi mở được hỏi trước.** Nếu plan còn mục "Câu hỏi mở" hoặc "Quyết định cần chốt", Telegram nhận các câu hỏi đó đầy đủ (reply câu trả lời, hoặc bấm *Claude tự quyết*). Claude dựng lại plan không còn câu hỏi, rồi danh sách các bước mới được gửi. Snippet `CLAUDE.md` cũng dặn Claude hỏi những câu này bằng `AskUserQuestion` trước khi trình plan.
 - Muốn nhận nguyên văn plan? Đặt `"planDetail": "full"` (hoặc `CC_NOTIFY_PLAN_DETAIL=full`).
 - Nếu bạn duyệt hoặc hủy ngay tại máy, tin Telegram tự đóng ("đã xử lý tại máy hoặc đã hủy") và nút biến mất. Bấm vào nút cũ sẽ hiện thông báo ngắn "yêu cầu đã đóng".
 - Chỉ `allowedUserIds` mới bấm nút hoặc góp ý được. Nếu bạn reply `local`, hết giờ chờ, hoặc không đọc được nội dung plan thì hộp thoại plan vẫn hiện tại máy như bình thường.

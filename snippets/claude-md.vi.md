@@ -24,6 +24,6 @@ dùng làm, kèm marker `<!-- CC_NOTIFY_ESCALATE -->` trên dòng riêng.
 Cũng dùng ESCALATE khi bạn dừng để **chờ người dùng chọn hướng hoặc xác nhận** (vd "chọn phương án nào?", "commit và push luôn không?", "cần QC bổ sung") — Stop hook không gửi gì nếu thiếu marker nên người dùng sẽ không biết bạn đang chờ. Chỉ cần một dòng `🛑` ngắn nêu rõ cần gì.
 
 Khi lập plan (plan mode), để tin Telegram gọn và đủ ý:
-- Câu hỏi cần người dùng quyết thì hỏi bằng `AskUserQuestion` **TRƯỚC** khi gọi `ExitPlanMode`; đừng để lại mục "Câu hỏi mở" trong plan đã trình.
+- Câu hỏi mở hoặc quyết định cần chốt thì hỏi **ngay** — hỏi bằng `AskUserQuestion` **TRƯỚC** khi gọi `ExitPlanMode`; đừng để lại mục "Câu hỏi mở" hay "Quyết định cần chốt" trong plan đã trình.
 - Viết mục `## Các bước`: liệt kê **đủ** các bước chính, mỗi bước **một câu ngắn** nêu việc đạt được (không nêu tên file).
 - Danh sách file/thay đổi cụ thể để ở mục `## Phạm vi thay đổi` — mục này **không** được gửi lên Telegram.

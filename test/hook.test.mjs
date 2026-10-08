@@ -954,3 +954,12 @@ test('runPlan: plan không còn câu hỏi mở → luồng duyệt bình thư�
   assert.match(h.sent[0].text, /^📋/);
   assert.match(h.sent[0].text, /1\. Tạo bảng daily_sales/);
 });
+
+test('extractOpenQuestions: mục "Quyết định cần chốt" / "Decisions needed" cũng được hỏi; "quyết định thiết kế" thì không', () => {
+  assert.match(extractOpenQuestions('# P\n## Các bước\n1. A b c\n## Quyết định cần chốt\n- Dùng Postgres hay SQLite?\n'), /Postgres hay SQLite/);
+  assert.match(extractOpenQuestions('# P\n## Decisions needed\n1. Which auth provider?\n'), /Which auth provider/);
+  assert.match(extractOpenQuestions('# P\n## TBD\n- retention period\n'), /retention period/);
+  assert.equal(extractOpenQuestions('# P\n## Quyết định thiết kế\n- Đã chọn Postgres vì ổn định\n'), '');
+  // và không lọt vào danh sách bước
+  assert.deepEqual(condensePlan('## Các bước\n1. Làm việc một\n## Quyết định cần chốt\n- Dùng Postgres hay SQLite?\n').steps, ['Làm việc một']);
+});
