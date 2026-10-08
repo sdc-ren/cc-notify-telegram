@@ -179,7 +179,7 @@ answer returned to the agent → it continues
 
 **Remote Permission.** A `PermissionRequest` hook fires right when the permission dialog is about to appear and sends the exact thing being requested with four buttons. The press is checked against `allowedUserIds` using Telegram's `from.id`, which cannot be spoofed.
 
-**Plan review (Claude Code).** When Claude calls `ExitPlanMode`, a **short summary of the plan** (title plus the main steps, without file paths, background or verification sections) is sent to Telegram with buttons:
+**Plan review (Claude Code).** When Claude calls `ExitPlanMode`, the plan is sent to Telegram as a **short list of all its main steps** (title + one short line per step; no file paths, background, scope-of-changes or verification sections) with buttons:
 
 ```
 📋 [Claude · proj · c3d4] Claude Code has a plan for you to review:
@@ -190,7 +190,6 @@ answer returned to the agent → it continues
 2. <main step>
 …
 
-(Summary only — full plan at the machine)
 
    [ ✅ Approve (ask per edit) ]
    [ ✅ Approve + auto-accept edits ]
@@ -199,6 +198,7 @@ answer returned to the agent → it continues
 
 - **Approve** leaves plan mode and starts the work. "Approve + auto-accept edits" also switches the session to `acceptEdits`.
 - **Review / request changes:** *reply to the plan message* with your feedback. Claude stays in plan mode, revises the plan and presents it again. "Not yet" does the same without feedback.
+- **Open questions first.** If the plan still has an "Open questions" section, Telegram gets those questions in full instead (reply with your answers, or tap *Let Claude decide*). Claude then rebuilds the plan without them and the step list is sent afterwards. The `CLAUDE.md` snippet also tells Claude to ask such questions with `AskUserQuestion` before presenting a plan.
 - Want the whole plan text instead? Set `"planDetail": "full"` (or `CC_NOTIFY_PLAN_DETAIL=full`).
 - If you approve or cancel at the machine instead, the Telegram message is closed automatically ("handled at the machine or cancelled") and its buttons disappear. Tapping an old button shows a short "request closed" notice.
 - Only `allowedUserIds` can press buttons or send feedback. If you reply `local`, the wait times out, or the plan text is unavailable, the normal plan dialog appears on your machine.
