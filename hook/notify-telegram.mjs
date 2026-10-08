@@ -166,6 +166,8 @@ export function loadConfig({ env = process.env, home = homedir(), providerId = '
     enabledProviders: normalizeEnabledProviders(file.enabledProviders),
     lang: file.lang === 'en' ? 'en' : 'vi',
     silent: file.silent === true,
+    // 'summary' (mặc định): chỉ gửi các bước chính của plan · 'full': nguyên văn.
+    planDetail: String(env.CC_NOTIFY_PLAN_DETAIL ?? file.planDetail ?? '').toLowerCase() === 'full' ? 'full' : 'summary',
     remoteConfig,
     remotePermissionConfig,
     // So sánh dạng chuỗi: config có thể ghi số hoặc chuỗi, from.id của Telegram luôn là số.
@@ -229,6 +231,8 @@ const STRINGS = {
     planNotice: (tag, provider = 'Claude Code') =>
       `📋 ${tag} ${provider} có plan cần bạn duyệt — mở ${provider} để đọc và chọn (Accept / Revise / Reject).`,
     planHeader: (tag, provider = 'Claude Code') => `📋 ${tag} ${provider} có plan cần bạn duyệt:`,
+    planSummaryNote: '(Bản tóm tắt — xem đầy đủ tại máy)',
+    planMore: (n) => `… +${n} bước nữa`,
     planFooter:
       '👇 Chọn bên dưới, hoặc REPLY tin này để góp ý / yêu cầu sửa plan — chỉ tài khoản trong allowlist mới thao tác được.',
     btnPlanApprove: '✅ Duyệt (hỏi từng bước)',
@@ -281,6 +285,8 @@ const STRINGS = {
     planNotice: (tag, provider = 'Claude Code') =>
       `📋 ${tag} ${provider} has a plan to review — open ${provider} to read and choose (Accept / Revise / Reject).`,
     planHeader: (tag, provider = 'Claude Code') => `📋 ${tag} ${provider} has a plan for you to review:`,
+    planSummaryNote: '(Summary only — full plan at the machine)',
+    planMore: (n) => `… +${n} more steps`,
     planFooter:
       '👇 Choose below, or REPLY to this message with feedback / requested changes — only allowlisted accounts can act.',
     btnPlanApprove: '✅ Approve (ask per edit)',
@@ -1132,9 +1138,114 @@ export function planTextOf(toolInput) {
   return typeof plan === 'string' ? plan.trim() : '';
 }
 
-export function buildPlanMessage({ plan, project, suffix, str, providerId }) {
+// --- Tóm tắt plan: điện thoại chỉ cần các bước chính, không cần bối cảnh / file / kiểm chứng ---
+
+const PLAN_STEP_HEADING = /bước|cách làm|step|implementation|approach|thực hiện|kế hoạch|changes|tasks?/i;
+const PLAN_SKIP_HEADING =
+  /context|bối cảnh|file|kiểm chứng|verif|test|ngoài phạm vi|out of scope|rủi ro|risk|ghi chú|note|lưu ý|why|vì sao|tóm tắt|summary/i;
+const PLAN_FILE_EXT = 'mjs|cjs|js|jsx|ts|tsx|json|md|py|sh|yml|yaml|css|html|toml|sql|vue|go|rs|java|rb|php|lock|env';
+// Đường dẫn file/thư mục (có đuôi file, bắt đầu ~/ ./ ../, thư mục kết thúc /, hoặc >= 2 cấp).
+// Route API kiểu /api/reports/daily (không đuôi file) được GIỮ vì mang nghĩa của bước.
+const PLAN_PATH_TOKEN = new RegExp(
+  `^(?:[~.]{1,2}/\\S*|\\S*/\\S*\\.(?:${PLAN_FILE_EXT})|[\\w.-]+\\.(?:${PLAN_FILE_EXT})|[\\w.-]+(?:/[\\w.-]+)*/|[\\w.-]+(?:/[\\w.-]+){2,})(?::\\d+)?[,.;:)]*$`,
+  'i'
+);
+// Giới từ đứng ngay trước đường dẫn bị bỏ ("ở app/x.ts", "in src/") cũng bỏ theo để câu không treo.
+const PLAN_DANGLING_WORD = /^(?:ở|trong|tại|vào|trên|file|tệp|thư mục|in|at|into|to|from|on|under)$/i;
+
+const PLAN_TRAILING_CONJ = /^(?:và|hoặc|với|cùng|and|or|with)$/i;
+
+function cleanPlanStep(raw, maxChars) {
+  let s = String(raw)
+    .replace(/^\[[ xX]\]\s*/, '')
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1') // link markdown → chỉ giữ chữ
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/[`*]+/g, '')
+    .replace(/\([^()]*\)/g, ''); // ngoặc đơn thường chỉ là chi tiết phụ
+  const kept = [];
+  for (const tok of s.split(/\s+/)) {
+    if (!tok) continue;
+    if (PLAN_PATH_TOKEN.test(tok)) {
+      if (kept.length && PLAN_DANGLING_WORD.test(kept.at(-1))) kept.pop();
+      continue;
+    }
+    kept.push(tok);
+  }
+  while (kept.length && (PLAN_DANGLING_WORD.test(kept.at(-1)) || PLAN_TRAILING_CONJ.test(kept.at(-1)))) kept.pop();
+  s = kept
+    .join(' ')
+    .replace(/\s+([,.;:])/g, '$1')
+    .replace(/[,;:]\s*$/, '')
+    .trim();
+  const firstSentence = s.split(/[.;]\s/)[0];
+  s = firstSentence.replace(/[.;]$/, '').trim();
+  if (Array.from(s).length > maxChars) {
+    const cut = Array.from(s).slice(0, maxChars).join('');
+    s = cut.replace(/\s+\S*$/, '') + '…';
+  }
+  return s;
+}
+
+// plan markdown dài → { title, steps[], total }: chỉ các bước làm chính, ngắn, không đường dẫn file.
+export function condensePlan(plan, { maxSteps = 8, maxStepChars = 110 } = {}) {
+  const lines = String(plan || '').split('\n');
+  const sections = [{ heading: '', level: 0, items: [] }];
+  let title = '';
+  let inFence = false;
+  for (const line of lines) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      inFence = !inFence;
+      continue;
+    }
+    if (inFence) continue;
+    const h = line.match(/^(#{1,6})\s+(.*\S)\s*$/);
+    if (h) {
+      const level = h[1].length;
+      const text = h[2].trim();
+      if (level === 1 && !title) {
+        title = text.replace(/^plan\s*[:\-–—]\s*/i, '');
+        continue;
+      }
+      // "### Bước 1: …" / "### 1. …" bản thân là một bước
+      if (level >= 2 && /^(\d+[.)]|step\s*\d+|bước\s*\d+)/i.test(text)) {
+        sections.push({ heading: '', level, items: [text.replace(/^(\d+[.)]\s*|step\s*\d+\s*[:.\-–—]?\s*|bước\s*\d+\s*[:.\-–—]?\s*)/i, '')], numbered: true });
+        continue;
+      }
+      sections.push({ heading: text, level, items: [] });
+      continue;
+    }
+    const item = line.match(/^ {0,1}(?:\d+[.)]|[-*+])\s+(.*\S)\s*$/);
+    if (item) sections.at(-1).items.push(item[1]);
+  }
+
+  const isSkipped = (s) => PLAN_SKIP_HEADING.test(s.heading) && !PLAN_STEP_HEADING.test(s.heading);
+  const stepSections = sections.filter((s) => s.items.length && PLAN_STEP_HEADING.test(s.heading));
+  const numbered = sections.filter((s) => s.numbered);
+  const chosen = stepSections.length ? stepSections : numbered.length ? numbered : sections.filter((s) => s.items.length && !isSkipped(s));
+
+  const all = chosen
+    .flatMap((s) => s.items)
+    .map((it) => cleanPlanStep(it, maxStepChars))
+    .filter(Boolean);
+  const steps = all.slice(0, maxSteps);
+  return { title: cleanPlanStep(title, 90), steps, total: all.length };
+}
+
+export function buildPlanMessage({ plan, project, suffix, str, providerId, detail = 'summary' }) {
   const tag = buildTag({ providerId, project, suffix });
-  return [str.planHeader(tag, providerId ? providerDisplayName(providerId) : undefined), '', plan, '', str.planFooter].join('\n');
+  const header = str.planHeader(tag, providerId ? providerDisplayName(providerId) : undefined);
+  if (detail === 'full') return [header, '', plan, '', str.planFooter].join('\n');
+
+  const { title, steps, total } = condensePlan(plan);
+  let body;
+  if (steps.length) {
+    body = steps.map((s, i) => `${i + 1}. ${s}`);
+    if (total > steps.length) body.push(str.planMore(total - steps.length));
+  } else {
+    // Không nhận ra cấu trúc → 600 ký tự đầu, đã bỏ markdown/đường dẫn.
+    body = [cleanPlanStep(String(plan).replace(/\s+/g, ' '), 600)];
+  }
+  return [header, '', ...(title ? [`📌 ${title}`, ''] : []), ...body, '', str.planSummaryNote, str.planFooter].join('\n');
 }
 
 // `a` = duyệt, vẫn hỏi từng lần sửa file · `e` = duyệt + tự sửa file · `d` = chưa ổn · `l` = để máy.
@@ -1329,7 +1440,7 @@ export async function runPlan(payload, cfg, tg, env, home, str) {
     project,
     suffix,
     kind: 'plan',
-    text: buildPlanMessage({ plan, project, suffix, str, providerId: cfg.providerId }),
+    text: buildPlanMessage({ plan, project, suffix, str, providerId: cfg.providerId, detail: cfg.planDetail }),
     keyboard: planKeyboard(key, str),
   });
   if (prompt.type !== 'ok') return null;

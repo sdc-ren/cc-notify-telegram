@@ -221,6 +221,7 @@ export async function runInit(flags, { home = homedir(), log = console.log } = {
       ...(allowedUserIds.length ? { allowedUserIds } : {}),
       remotePermission: remotePermissionConfig,
       ...(existing.sessionAllowTtlMin ? { sessionAllowTtlMin: existing.sessionAllowTtlMin } : {}),
+      ...(existing.planDetail ? { planDetail: existing.planDetail } : {}),
     };
     const configFile = writeConfig(config, home);
     log(`✅ Config → ${configFile} (chmod 600)`);

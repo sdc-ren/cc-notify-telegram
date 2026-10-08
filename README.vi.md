@@ -269,12 +269,18 @@ trả decision allow/deny về Agent → lệnh chạy / bị chặn
 ```
 
 
-**Duyệt / góp ý plan (Claude Code).** Khi Claude gọi `ExitPlanMode`, toàn bộ plan được gửi lên Telegram kèm nút:
+**Duyệt / góp ý plan (Claude Code).** Khi Claude gọi `ExitPlanMode`, một **bản tóm tắt plan** (tiêu đề và các bước chính, bỏ đường dẫn file, bối cảnh, phần kiểm chứng) được gửi lên Telegram kèm nút:
 
 ```
 📋 [Claude · proj · c3d4] Claude Code có plan cần bạn duyệt:
 
-<nội dung plan>
+📌 <tiêu đề plan>
+
+1. <bước chính>
+2. <bước chính>
+…
+
+(Bản tóm tắt — xem đầy đủ tại máy)
 
    [ ✅ Duyệt (hỏi từng bước) ]
    [ ✅ Duyệt + tự sửa file ]
@@ -283,9 +289,10 @@ trả decision allow/deny về Agent → lệnh chạy / bị chặn
 
 - **Duyệt** thoát plan mode và bắt đầu làm. "Duyệt + tự sửa file" còn chuyển session sang `acceptEdits`.
 - **Review / yêu cầu sửa:** *reply vào tin plan* với góp ý của bạn. Claude giữ nguyên plan mode, sửa plan rồi trình lại. Nút "Chưa ổn" cũng vậy nhưng không kèm góp ý.
+- Muốn nhận nguyên văn plan? Đặt `"planDetail": "full"` (hoặc `CC_NOTIFY_PLAN_DETAIL=full`).
 - Chỉ `allowedUserIds` mới bấm nút hoặc góp ý được. Nếu bạn reply `local`, hết giờ chờ, hoặc không đọc được nội dung plan thì hộp thoại plan vẫn hiện tại máy như bình thường.
 
-> Tính năng này dựa vào việc hook `PermissionRequest` của Claude Code hoạt động với `ExitPlanMode` như tài liệu mô tả. Nếu phiên bản của bạn bỏ qua quyết định của hook, hộp thoại vẫn hiện tại máy nên không mất gì; hãy mở issue kèm `claude --version`.
+> Tính năng này dựa vào hook `PermissionRequest` của Claude Code cho `ExitPlanMode`, đã kiểm chứng end-to-end trên Claude Code 2.1.287. Nếu phiên bản của bạn bỏ qua quyết định của hook, hộp thoại vẫn hiện tại máy nên không mất gì; hãy mở issue kèm `claude --version`.
 
 ---
 
@@ -325,8 +332,9 @@ File `~/.config/ai-notify-telegram/config.json` (chmod 600 — chứa token, **k
 | `remotePermission` | | `{"global": false}` | Trạng thái Remote Permission toàn cục & cho từng Agent |
 | `allowedUserIds` | | `[]` | Telegram user ID được quyền duyệt permission. **Rỗng = không ai duyệt được** |
 | `sessionAllowTtlMin` | | `30` | Hạn của nút "Cho phép tất cả trong session này" (trần 480) |
+| `planDetail` | | `summary` | `summary` gửi tiêu đề và các bước chính của plan; `full` gửi nguyên văn plan |
 
-Env override (ưu tiên hơn file — tiện CI): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_THREAD_ID`, `CC_NOTIFY_REMOTE`, `CC_NOTIFY_REMOTE_PERM`.
+Env override (ưu tiên hơn file — tiện CI): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_THREAD_ID`, `CC_NOTIFY_REMOTE`, `CC_NOTIFY_REMOTE_PERM`, `CC_NOTIFY_PLAN_DETAIL`.
 
 ---
 

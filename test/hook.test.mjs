@@ -13,6 +13,7 @@ import {
   buildStopMessage,
   chunkMessage,
   classifyUpdate,
+  condensePlan,
   denyOutput,
   describePermission,
   extractDoneSummary,
@@ -559,11 +560,91 @@ test('planTextOf: lấy tool_input.plan, rỗng / sai kiểu → chuỗi rỗng'
   assert.equal(planTextOf({}), '');
 });
 
-test('buildPlanMessage: có tag, NGUYÊN VĂN plan và hướng dẫn reply', () => {
-  const msg = buildPlanMessage({ plan: '# Plan\n- step 1', project: 'proj', suffix: 'a1b2', str, providerId: 'claude' });
+test('buildPlanMessage detail=full: có tag, NGUYÊN VĂN plan và hướng dẫn reply', () => {
+  const msg = buildPlanMessage({ plan: '# Plan\n- step 1', project: 'proj', suffix: 'a1b2', str, providerId: 'claude', detail: 'full' });
   assert.match(msg, /^📋 \[Claude · proj · a1b2\]/);
   assert.match(msg, /# Plan\n- step 1/);
   assert.match(msg, /REPLY/);
+});
+
+const LONG_PLAN = [
+  '# Plan: Thêm báo cáo doanh thu',
+  '',
+  '## Context',
+  'Cửa hàng cần xem doanh thu. Đây là đoạn bối cảnh dài không nên xuất hiện.',
+  '',
+  '## Cách làm',
+  '1. Tạo bảng `daily_sales` trong `db/migrations/2026_add_sales.sql` (cột ngày, tổng tiền)',
+  '2. Viết API `GET /api/reports/daily` ở `app/api/reports/route.ts`, trả về tổng theo ngày.',
+  '3. **Thêm trang** `app/(admin)/reports/page.tsx` với biểu đồ [Recharts](https://recharts.org)',
+  '   - chi tiết con không cần',
+  '```js',
+  '- không phải bước',
+  '```',
+  '4. Cập nhật tài liệu trong docs/ và README.md',
+  '',
+  '## File liên quan',
+  '- app/api/reports/route.ts',
+  '',
+  '## Kiểm chứng',
+  '- chạy npm test',
+].join('\n');
+
+test('condensePlan: chỉ giữ các bước chính, bỏ context/file/kiểm chứng, đường dẫn, markdown, mục con', () => {
+  const { title, steps, total } = condensePlan(LONG_PLAN);
+  assert.equal(title, 'Thêm báo cáo doanh thu');
+  assert.deepEqual(steps, [
+    'Tạo bảng daily_sales',
+    'Viết API GET /api/reports/daily trả về tổng theo ngày',
+    'Thêm trang với biểu đồ Recharts',
+    'Cập nhật tài liệu',
+  ]);
+  assert.equal(total, 4);
+});
+
+test('condensePlan: giới hạn số bước và độ dài mỗi bước', () => {
+  const plan = '## Steps\n' + Array.from({ length: 12 }, (_, i) => `- Việc ${i + 1} ${'rất dài '.repeat(30)}`).join('\n');
+  const { steps, total } = condensePlan(plan, { maxSteps: 5, maxStepChars: 40 });
+  assert.equal(steps.length, 5);
+  assert.equal(total, 12);
+  for (const s of steps) assert.ok(Array.from(s).length <= 41, s);
+});
+
+test('condensePlan: heading kiểu "### Bước 1: …" và plan không có cấu trúc', () => {
+  const byHeading = condensePlan('# Plan: X\n### Bước 1: Dựng DB\nmô tả\n### Bước 2: Viết API\n');
+  assert.deepEqual(byHeading.steps, ['Dựng DB', 'Viết API']);
+  assert.deepEqual(condensePlan('Chỉ là một đoạn văn.').steps, []);
+});
+
+test('buildPlanMessage (mặc định summary): ngắn hơn bản đầy đủ, có ghi chú tóm tắt, không còn đường dẫn/bối cảnh', () => {
+  const summary = buildPlanMessage({ plan: LONG_PLAN, project: 'shop', suffix: 'ab12', str, providerId: 'claude' });
+  const full = buildPlanMessage({ plan: LONG_PLAN, project: 'shop', suffix: 'ab12', str, providerId: 'claude', detail: 'full' });
+  assert.ok(summary.length < full.length / 2);
+  assert.match(summary, /📌 Thêm báo cáo doanh thu/);
+  assert.match(summary, /1\. Tạo bảng daily_sales/);
+  assert.match(summary, /Bản tóm tắt/);
+  assert.doesNotMatch(summary, /bối cảnh|route\.ts|\.sql|Kiểm chứng/);
+});
+
+test('buildPlanMessage summary: plan không có cấu trúc → fallback đoạn đầu đã làm sạch; quá nhiều bước → "+N"', () => {
+  const free = buildPlanMessage({ plan: 'Sửa **file** src/a/b/c.ts và thêm test.', project: 'p', suffix: '', str, providerId: 'claude' });
+  assert.match(free, /Sửa và thêm test/);
+  const many = '## Steps\n' + Array.from({ length: 11 }, (_, i) => `- Việc số ${i + 1}`).join('\n');
+  assert.match(buildPlanMessage({ plan: many, project: 'p', suffix: '', str, providerId: 'claude' }), /… \+3 bước nữa/);
+});
+
+test('loadConfig: planDetail mặc định summary, "full" qua file hoặc env', () => {
+  const home = mkdtempSync(join(tmpdir(), 'pd-'));
+  mkdirSync(join(home, '.config', 'ai-notify-telegram'), { recursive: true });
+  const write = (o) => writeFileSync(join(home, '.config', 'ai-notify-telegram', 'config.json'), JSON.stringify({ botToken: 't', chatId: '1', ...o }));
+  write({});
+  assert.equal(loadConfig({ env: {}, home }).planDetail, 'summary');
+  write({ planDetail: 'full' });
+  assert.equal(loadConfig({ env: {}, home }).planDetail, 'full');
+  write({ planDetail: 'full' });
+  assert.equal(loadConfig({ env: { CC_NOTIFY_PLAN_DETAIL: 'summary' }, home }).planDetail, 'summary');
+  write({ planDetail: 'bậy' });
+  assert.equal(loadConfig({ env: {}, home }).planDetail, 'summary');
 });
 
 test('planKeyboard: a/e/d/l, callback_data <= 64 byte, khớp regex classifyUpdate', () => {

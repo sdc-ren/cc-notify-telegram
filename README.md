@@ -179,12 +179,18 @@ answer returned to the agent → it continues
 
 **Remote Permission.** A `PermissionRequest` hook fires right when the permission dialog is about to appear and sends the exact thing being requested with four buttons. The press is checked against `allowedUserIds` using Telegram's `from.id`, which cannot be spoofed.
 
-**Plan review (Claude Code).** When Claude calls `ExitPlanMode`, the full plan is sent to Telegram with buttons:
+**Plan review (Claude Code).** When Claude calls `ExitPlanMode`, a **short summary of the plan** (title plus the main steps, without file paths, background or verification sections) is sent to Telegram with buttons:
 
 ```
 📋 [Claude · proj · c3d4] Claude Code has a plan for you to review:
 
-<the plan text>
+📌 <plan title>
+
+1. <main step>
+2. <main step>
+…
+
+(Summary only — full plan at the machine)
 
    [ ✅ Approve (ask per edit) ]
    [ ✅ Approve + auto-accept edits ]
@@ -193,9 +199,10 @@ answer returned to the agent → it continues
 
 - **Approve** leaves plan mode and starts the work. "Approve + auto-accept edits" also switches the session to `acceptEdits`.
 - **Review / request changes:** *reply to the plan message* with your feedback. Claude stays in plan mode, revises the plan and presents it again. "Not yet" does the same without feedback.
+- Want the whole plan text instead? Set `"planDetail": "full"` (or `CC_NOTIFY_PLAN_DETAIL=full`).
 - Only `allowedUserIds` can press buttons or send feedback. If you reply `local`, the wait times out, or the plan text is unavailable, the normal plan dialog appears on your machine.
 
-> Plan review relies on Claude Code's `PermissionRequest` hook behaving for `ExitPlanMode` as documented. If your Claude Code version ignores the hook's decision, the dialog still shows locally, so nothing is lost; please open an issue with your `claude --version`.
+> Plan review relies on Claude Code's `PermissionRequest` hook for `ExitPlanMode`. It was verified end to end on Claude Code 2.1.287. If your version ignores the hook's decision, the dialog still shows locally, so nothing is lost; please open an issue with your `claude --version`.
 
 **Codex App Server bridge.** Codex completion uses the official `Stop` hook and permissions use `PermissionRequest`. Remote Ask for Codex needs the experimental App Server API, so use `cc-notify-telegram codex-bridge` as the app-server command. It proxies JSON-RPC between your client and `codex app-server --stdio` and intercepts `item/tool/requestUserInput` plus the approval requests (`item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `execCommandApproval`, `applyPatchApproval`).
 
@@ -240,8 +247,9 @@ If Telegram times out, or you reply/choose `local`, the request goes back to the
 | `remotePermission` | | `{"global": false}` | Remote Permission switches (global + per agent) |
 | `allowedUserIds` | | `[]` | Telegram user IDs allowed to approve. **Empty = nobody** |
 | `sessionAllowTtlMin` | | `30` | Lifetime of "Allow all in this session" (max 480) |
+| `planDetail` | | `summary` | `summary` sends the plan's title and main steps; `full` sends the whole plan text |
 
-Environment overrides: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_THREAD_ID`, `CC_NOTIFY_REMOTE`, `CC_NOTIFY_REMOTE_PERM`.
+Environment overrides: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_THREAD_ID`, `CC_NOTIFY_REMOTE`, `CC_NOTIFY_REMOTE_PERM`, `CC_NOTIFY_PLAN_DETAIL`.
 
 ### Telegram Topics
 
