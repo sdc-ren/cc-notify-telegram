@@ -227,6 +227,9 @@ const STRINGS = {
     permMovedLocal: '🖥 Yêu cầu quyền chuyển về máy — đang chờ tại terminal…',
     permSendFailed: '⚠️ Không gửi được đầy đủ nội dung — yêu cầu quyền chuyển về máy.',
     permClosed: '⛔ Yêu cầu quyền đã đóng (lượt làm việc kết thúc).',
+    permClosedLocal: '🖥 Yêu cầu quyền đã được xử lý tại máy hoặc đã hủy.',
+    planClosedLocal: '🖥 Plan đã được xử lý tại máy hoặc đã hủy.',
+    staleButton: 'Yêu cầu này đã đóng (xử lý tại máy hoặc đã hủy) — nút không còn tác dụng.',
     permNoRight: 'Bạn không có quyền duyệt yêu cầu này.',
     planNotice: (tag, provider = 'Claude Code') =>
       `📋 ${tag} ${provider} có plan cần bạn duyệt — mở ${provider} để đọc và chọn (Accept / Revise / Reject).`,
@@ -281,6 +284,9 @@ const STRINGS = {
     permMovedLocal: '🖥 Permission request moved to the machine — waiting at the terminal…',
     permSendFailed: '⚠️ Could not send the full request — falling back to the machine.',
     permClosed: '⛔ Permission request closed (turn ended).',
+    permClosedLocal: '🖥 Permission request was handled at the machine or cancelled.',
+    planClosedLocal: '🖥 Plan was handled at the machine or cancelled.',
+    staleButton: 'This request is closed (handled at the machine or cancelled) — the button no longer does anything.',
     permNoRight: 'You are not allowed to approve this request.',
     planNotice: (tag, provider = 'Claude Code') =>
       `📋 ${tag} ${provider} has a plan to review — open ${provider} to read and choose (Accept / Revise / Reject).`,
@@ -365,6 +371,9 @@ export function makeTelegram(cfg, fetchFn = fetch) {
     // nên tin đã chốt không thể bị bấm lại.
     editMessageText: (messageId, text) =>
       call('editMessageText', { chat_id: cfg.chatId, message_id: messageId, text }),
+    // Gỡ bàn phím nút mà không đụng nội dung tin (dùng cho tin đã đóng).
+    clearKeyboard: (messageId) =>
+      call('editMessageReplyMarkup', { chat_id: cfg.chatId, message_id: messageId, reply_markup: { inline_keyboard: [] } }),
     answerCallbackQuery: (callbackQueryId, extra = {}) =>
       call('answerCallbackQuery', { callback_query_id: callbackQueryId, ...extra }),
     getUpdates: (params) =>
@@ -672,9 +681,12 @@ export function classifyUpdate(update, ctx) {
   if (cq) {
     if (String(cq.message?.chat?.id) !== String(ctx.chatId)) return { kind: 'ignore' };
     const messageId = cq.message?.message_id;
-    if (messageId == null || !ctx.pending.flatMap(idsOf).includes(messageId)) return { kind: 'ignore' };
     const action = String(cq.data || '').match(/^([adesl]):/)?.[1];
-    if (!action) return { kind: 'ignore' };
+    if (messageId == null || !action) return { kind: 'ignore' };
+    // Nút của một yêu cầu không còn chờ nữa (đã xử lý tại máy / hủy / hết hạn) → báo cho người bấm.
+    if (!ctx.pending.flatMap(idsOf).includes(messageId)) {
+      return { kind: 'stale-callback', messageId, callbackId: cq.id, fromId: cq.from?.id };
+    }
     return {
       kind: 'callback',
       action,
@@ -891,6 +903,13 @@ async function waitForReply({ tg, cfg, dir, ownMessageIds, deadline, env, home, 
           } catch {
             // session kia sẽ timeout → chấp nhận
           }
+        } else if (verdict.kind === 'stale-callback') {
+          // Chỉ người trong allowlist mới được "chạm" vào bot; còn lại im lặng.
+          if (!live.allowedUserIds.includes(String(verdict.fromId))) continue;
+          await tg
+            .answerCallbackQuery(verdict.callbackId, { text: strings(cfg).staleButton, show_alert: true })
+            .catch(() => {});
+          await tg.clearKeyboard(verdict.messageId).catch(() => {});
         } else if (verdict.kind === 'reply') {
           // Reply vào tin PLAN là chỉ đạo thẳng cho agent → chỉ allowlist mới được góp ý.
           const target = pending.find((p) => idsOf(p).includes(verdict.messageId));
@@ -1023,18 +1042,21 @@ async function runAskDone(payload, cfg, tg, home = homedir()) {
 }
 
 // Stop sweep: câu hỏi bị Esc (PostToolUse không bắn) → đóng tin cho khỏi treo mồ côi.
-async function sweepSessionPending(sessionId, cfg, tg, home = homedir()) {
+async function sweepSessionPending(sessionId, cfg, tg, home = homedir(), { kinds } = {}) {
   if (!sessionId) return;
   const dir = stateDir(home);
   for (const p of listPending(dir)) {
     if (p.sessionId !== sessionId) continue;
+    if (kinds && !kinds.includes(p.kind)) continue;
     try {
       unlinkSync(p.file);
     } catch {
       continue; // process khác vừa xử lý
     }
     const str = strings(cfg);
-    await tg.editMessageText(p.messageId, p.kind === 'perm' ? str.permClosed : str.closedUnanswered).catch(() => {});
+    const closedText =
+      p.kind === 'plan' ? str.planClosedLocal : p.kind === 'perm' ? str.permClosed : str.closedUnanswered;
+    await tg.editMessageText(p.messageId, closedText).catch(() => {});
   }
 }
 
@@ -1317,6 +1339,27 @@ export function buildPlanNotice({ project, suffix, str, providerId }) {
   return str.planNotice(tag, providerId ? providerDisplayName(providerId) : undefined);
 }
 
+// Chạy `onClose` (best-effort, tối đa 4s) khi process bị tắt bằng tín hiệu rồi thoát. Trả về hàm gỡ.
+export function closeOnSignal(onClose, { signals = ['SIGTERM', 'SIGINT', 'SIGHUP'], exit = (code) => process.exit(code) } = {}) {
+  let fired = false;
+  const handler = () => {
+    if (fired) return;
+    fired = true;
+    const timer = setTimeout(() => exit(0), 4000);
+    Promise.resolve()
+      .then(onClose)
+      .catch(() => {})
+      .finally(() => {
+        clearTimeout(timer);
+        exit(0);
+      });
+  };
+  for (const s of signals) process.on(s, handler);
+  return () => {
+    for (const s of signals) process.off(s, handler);
+  };
+}
+
 export async function promptTelegramPermission({
   payload,
   cfg,
@@ -1396,16 +1439,32 @@ export async function promptTelegramPermission({
     })
   );
 
-  const outcome = await waitForReply({
-    tg,
-    cfg,
-    dir,
-    ownMessageIds: messageIds,
-    deadline: Date.now() + cfg.remoteAskTimeoutSec * 1000,
-    env,
-    home,
-    mode: 'perm',
+  // Claude Code tắt hook đang chờ khi người dùng duyệt / hủy ngay tại máy → đóng tin Telegram
+  // (gỡ nút) trước khi thoát, nếu không nút cứ treo và bấm vào không có phản hồi.
+  const stopWatching = closeOnSignal(() => {
+    try {
+      unlinkSync(pendingPath(dir, key));
+    } catch {
+      // đã bị sweep
+    }
+    return tg.editMessageText(anchorId, kind === 'plan' ? str.planClosedLocal : str.permClosedLocal);
   });
+
+  let outcome;
+  try {
+    outcome = await waitForReply({
+      tg,
+      cfg,
+      dir,
+      ownMessageIds: messageIds,
+      deadline: Date.now() + cfg.remoteAskTimeoutSec * 1000,
+      env,
+      home,
+      mode: 'perm',
+    });
+  } finally {
+    stopWatching();
+  }
 
   try {
     unlinkSync(pendingPath(dir, key));
@@ -1551,6 +1610,11 @@ async function runNotify(payload, cfg, tg, env) {
         : strings(cfg).donePlain);
     await tg.sendMessage(`✅ ${tag}\n${body}`, { providerId: cfg.providerId });
     return;
+  }
+  // Claude đang rảnh chờ người dùng (idle) thì không thể còn hộp thoại quyền/plan nào đang chờ:
+  // dọn tin nút còn sót (người dùng đã hủy tại máy — hook Stop không chạy khi bấm hủy).
+  if (payload.notification_type === 'idle_prompt') {
+    await sweepSessionPending(payload.session_id, cfg, tg, homedir(), { kinds: ['perm', 'plan'] }).catch(() => {});
   }
   const message = payload.message;
   if (!message || typeof message !== 'string') return;
