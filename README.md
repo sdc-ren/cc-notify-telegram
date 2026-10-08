@@ -179,7 +179,23 @@ answer returned to the agent → it continues
 
 **Remote Permission.** A `PermissionRequest` hook fires right when the permission dialog is about to appear and sends the exact thing being requested with four buttons. The press is checked against `allowedUserIds` using Telegram's `from.id`, which cannot be spoofed.
 
-**Plans.** Plan approvals (`ExitPlanMode`) get a notice only, with no buttons. Reviewing a plan needs the full text, so the decision stays on your machine.
+**Plan review (Claude Code).** When Claude calls `ExitPlanMode`, the full plan is sent to Telegram with buttons:
+
+```
+📋 [Claude · proj · c3d4] Claude Code has a plan for you to review:
+
+<the plan text>
+
+   [ ✅ Approve (ask per edit) ]
+   [ ✅ Approve + auto-accept edits ]
+   [ ✏️ Not yet ]  [ 🖥 Handle at the machine ]
+```
+
+- **Approve** leaves plan mode and starts the work. "Approve + auto-accept edits" also switches the session to `acceptEdits`.
+- **Review / request changes:** *reply to the plan message* with your feedback. Claude stays in plan mode, revises the plan and presents it again. "Not yet" does the same without feedback.
+- Only `allowedUserIds` can press buttons or send feedback. If you reply `local`, the wait times out, or the plan text is unavailable, the normal plan dialog appears on your machine.
+
+> Plan review relies on Claude Code's `PermissionRequest` hook behaving for `ExitPlanMode` as documented. If your Claude Code version ignores the hook's decision, the dialog still shows locally, so nothing is lost; please open an issue with your `claude --version`.
 
 **Codex App Server bridge.** Codex completion uses the official `Stop` hook and permissions use `PermissionRequest`. Remote Ask for Codex needs the experimental App Server API, so use `cc-notify-telegram codex-bridge` as the app-server command. It proxies JSON-RPC between your client and `codex app-server --stdio` and intercepts `item/tool/requestUserInput` plus the approval requests (`item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `execCommandApproval`, `applyPatchApproval`).
 

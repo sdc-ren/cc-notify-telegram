@@ -20,3 +20,5 @@ Example: `<!-- CC_NOTIFY_DONE: Fixed summary hook | merged #65 -->`
 When TRULY STUCK — user intervention is required to continue (not a routine clarifying
 question) — end your message with a line starting with `🛑` briefly describing what the user
 must do, plus the marker `<!-- CC_NOTIFY_ESCALATE -->` on its own line.
+
+Also use ESCALATE when you stop to **wait for the user to choose a direction or confirm something** (e.g. "which option?", "commit and push now?", "need QC input") — the Stop hook sends nothing without a marker, so the user would never know you are waiting. Keep it to one short `🛑` line saying what you need.

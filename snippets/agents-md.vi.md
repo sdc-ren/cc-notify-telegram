@@ -12,3 +12,5 @@ Khi thật sự bế tắc và cần người dùng can thiệp mới tiếp t�
 đầu với `🛑` và thêm marker:
 
 `<!-- AI_NOTIFY_ESCALATE -->`
+
+Cũng dùng khi bạn dừng để chờ người dùng chọn hướng hoặc xác nhận (vd "chọn phương án nào?", "push luôn không?"): thiếu marker thì không có tin nào được gửi nên người dùng không biết bạn đang chờ. Chỉ cần một dòng `🛑` ngắn nêu rõ cần gì.

@@ -8,6 +8,7 @@ import {
   buildAskMessage,
   buildDenyReason,
   buildPermMessage,
+  buildPlanMessage,
   buildPlanNotice,
   buildStopMessage,
   chunkMessage,
@@ -24,6 +25,10 @@ import {
   loadConfig,
   pendingKey,
   permKeyboard,
+  planApproveOutput,
+  runPlan,
+  planKeyboard,
+  planTextOf,
   permOutput,
   readSessionAllow,
   resolveAnswerTokens,
@@ -218,7 +223,13 @@ test('classifyUpdate: private — 1 câu chờ nhận tin trần MỚI, nhiều 
   const fresh = { message: { chat: { id: 5, type: 'private' }, text: 'chọn 1', date: nowSec + 5 } };
   const stale = { message: { chat: { id: 5, type: 'private' }, text: 'tin cũ', date: nowSec - 3600 } };
 
-  assert.deepEqual(classifyUpdate(fresh, one), { kind: 'reply', messageId: 10, text: 'chọn 1' });
+  assert.deepEqual(classifyUpdate(fresh, one), {
+    kind: 'reply',
+    messageId: 10,
+    text: 'chọn 1',
+    fromId: undefined,
+    fromName: '',
+  });
   assert.equal(classifyUpdate(stale, one).kind, 'ignore'); // backlog cũ không được tính
 
   const two = { chatId: 5, pending: [{ messageId: 10, sentAt: now }, { messageId: 11, sentAt: now }] };
@@ -237,6 +248,8 @@ test('classifyUpdate: câu hỏi bị chunk (nhiều messageIds) — reply vào 
     kind: 'reply',
     messageId: 29,
     text: '2C',
+    fromId: undefined,
+    fromName: '',
   });
   // reply vào chunk đầu (28) cũng khớp
   assert.equal(classifyUpdate({ message: { ...base, reply_to_message: { message_id: 28 } } }, ctx).messageId, 28);
@@ -532,4 +545,179 @@ test('shouldSkipNotification: bỏ permission_prompt khi remote-perm ON, nhưng 
   // type khác permission_prompt (idle/agent chờ input) → luôn giữ
   assert.equal(shouldSkipNotification('idle_prompt', 'waiting for input', on), false);
   assert.equal(shouldSkipNotification('agent_needs_input', 'Plan ready for review', on), false);
+});
+
+// ---------------------------------------------------------------------------
+// Plan (ExitPlanMode) qua Telegram
+// ---------------------------------------------------------------------------
+
+test('planTextOf: lấy tool_input.plan, rỗng / sai kiểu → chuỗi rỗng', () => {
+  assert.equal(planTextOf({ plan: '  # Plan\n- a  ' }), '# Plan\n- a');
+  assert.equal(planTextOf({ plan: '' }), '');
+  assert.equal(planTextOf({ plan: 42 }), '');
+  assert.equal(planTextOf(null), '');
+  assert.equal(planTextOf({}), '');
+});
+
+test('buildPlanMessage: có tag, NGUYÊN VĂN plan và hướng dẫn reply', () => {
+  const msg = buildPlanMessage({ plan: '# Plan\n- step 1', project: 'proj', suffix: 'a1b2', str, providerId: 'claude' });
+  assert.match(msg, /^📋 \[Claude · proj · a1b2\]/);
+  assert.match(msg, /# Plan\n- step 1/);
+  assert.match(msg, /REPLY/);
+});
+
+test('planKeyboard: a/e/d/l, callback_data <= 64 byte, khớp regex classifyUpdate', () => {
+  const key = pendingKey('sess', [{ question: 'ExitPlanMode:x' }]);
+  const flat = planKeyboard(key, str).inline_keyboard.flat();
+  assert.deepEqual(flat.map((b) => b.callback_data.split(':')[0]).sort(), ['a', 'd', 'e', 'l']);
+  for (const b of flat) {
+    assert.ok(Buffer.byteLength(b.callback_data) <= 64);
+    const ctx = { chatId: 1, pending: [{ messageId: 5, kind: 'plan', sentAt: Date.now() }] };
+    const verdict = classifyUpdate(
+      { callback_query: { id: 'c', data: b.callback_data, from: { id: 9 }, message: { chat: { id: 1 }, message_id: 5 } } },
+      ctx
+    );
+    assert.equal(verdict.kind, 'callback');
+  }
+});
+
+test('planApproveOutput: allow + echo updatedInput + setMode session', () => {
+  const input = { plan: '# P', planFilePath: '/x.md' };
+  const out = JSON.parse(planApproveOutput(input, 'acceptEdits')).hookSpecificOutput;
+  assert.equal(out.hookEventName, 'PermissionRequest');
+  assert.equal(out.decision.behavior, 'allow');
+  assert.deepEqual(out.decision.updatedInput, input);
+  assert.deepEqual(out.decision.updatedPermissions, [{ type: 'setMode', mode: 'acceptEdits', destination: 'session' }]);
+});
+
+test('permOutput allow thường KHÔNG kèm updatedInput/updatedPermissions', () => {
+  const d = JSON.parse(permOutput('allow')).hookSpecificOutput.decision;
+  assert.deepEqual(d, { behavior: 'allow' });
+});
+
+test('classifyUpdate: text reply vào tin plan được nhận (kèm fromId để kiểm allowlist)', () => {
+  const ctx = { chatId: 7, pending: [{ messageId: 30, kind: 'plan', sentAt: Date.now() }] };
+  const msg = {
+    chat: { id: 7, type: 'supergroup' },
+    text: 'thêm bước test',
+    date: Math.floor(Date.now() / 1000),
+    from: { id: 111, first_name: 'Sơn' },
+    reply_to_message: { message_id: 30 },
+  };
+  assert.deepEqual(classifyUpdate({ message: msg }, ctx), {
+    kind: 'reply',
+    messageId: 30,
+    text: 'thêm bước test',
+    fromId: 111,
+    fromName: 'Sơn',
+  });
+});
+
+// --- runPlan end-to-end với Telegram giả ---
+
+function planHarness({ updates, plan = '# Plan\n- bước 1' }) {
+  const home = mkdtempSync(join(tmpdir(), 'plan-'));
+  mkdirSync(join(home, '.config', 'ai-notify-telegram'), { recursive: true });
+  const cfgFile = {
+    botToken: 't',
+    chatId: '7',
+    allowedUserIds: ['111'],
+    remote: { global: true, providers: { claude: true } },
+    remotePermission: { global: true, providers: { claude: true } },
+    remoteAskTimeoutSec: 5,
+  };
+  writeFileSync(join(home, '.config', 'ai-notify-telegram', 'config.json'), JSON.stringify(cfgFile));
+  const cfg = loadConfig({ env: {}, home, providerId: 'claude' });
+  const sent = [];
+  const edits = [];
+  const queue = [...updates];
+  const tg = {
+    sendMessage: async (text, opts) => {
+      sent.push({ text, opts });
+      return { message_id: 100 + sent.length };
+    },
+    editMessageText: async (id, text) => edits.push({ id, text }),
+    answerCallbackQuery: async () => {},
+    getUpdates: async () => queue.splice(0, 1),
+  };
+  const payload = { session_id: 'sess-abcd', cwd: '/x/proj', tool_name: 'ExitPlanMode', tool_input: { plan, planFilePath: '/p.md' } };
+  return { home, cfg, tg, sent, edits, payload, run: () => runPlan(payload, cfg, tg, {}, home, strings(cfg)) };
+}
+
+const cb = (id, data, fromId = 111) => ({
+  update_id: id,
+  callback_query: { id: `c${id}`, data, from: { id: fromId, first_name: 'Sơn' }, message: { chat: { id: 7 }, message_id: 101 } },
+});
+const keyOf = (h) => h.sent[0].opts.reply_markup.inline_keyboard.flat()[0].callback_data.split(':')[1];
+
+test('runPlan: nút "Duyệt + tự sửa file" → allow + setMode acceptEdits', async () => {
+  const h = planHarness({ updates: [] });
+  h.tg.getUpdates = async () => [cb(1, `e:${keyOf(h)}`)];
+  const out = JSON.parse(await h.run()).hookSpecificOutput.decision;
+  assert.equal(out.behavior, 'allow');
+  assert.equal(out.updatedPermissions[0].mode, 'acceptEdits');
+  assert.deepEqual(out.updatedInput, h.payload.tool_input);
+  assert.match(h.edits[0].text, /Đã duyệt plan/);
+});
+
+test('runPlan: reply của người trong allowlist → deny kèm góp ý nguyên văn', async () => {
+  const h = planHarness({ updates: [] });
+  h.tg.getUpdates = async () => [
+    {
+      update_id: 1,
+      message: {
+        chat: { id: 7, type: 'supergroup' },
+        text: 'thêm bước viết test',
+        date: Math.floor(Date.now() / 1000),
+        from: { id: 111, first_name: 'Sơn' },
+        reply_to_message: { message_id: 101 },
+      },
+    },
+  ];
+  const out = JSON.parse(await h.run()).hookSpecificOutput.decision;
+  assert.equal(out.behavior, 'deny');
+  assert.match(out.message, /thêm bước viết test/);
+  assert.match(h.edits[0].text, /Đã gửi góp ý/);
+});
+
+test('runPlan: reply của người NGOÀI allowlist bị bỏ qua (hết giờ → nhả về máy)', async () => {
+  const h = planHarness({ updates: [] });
+  let first = true;
+  h.tg.getUpdates = async () => {
+    if (!first) return [];
+    first = false;
+    return [
+      {
+        update_id: 1,
+        message: {
+          chat: { id: 7, type: 'supergroup' },
+          text: 'duyệt đi',
+          date: Math.floor(Date.now() / 1000),
+          from: { id: 999 },
+          reply_to_message: { message_id: 101 },
+        },
+      },
+    ];
+  };
+  h.cfg.remoteAskTimeoutSec = 1;
+  assert.equal(await h.run(), null);
+  assert.match(h.edits.at(-1).text, /Hết giờ/);
+});
+
+test('runPlan: nút "Chưa ổn" → deny; nút "Để máy xử lý" → null', async () => {
+  const h = planHarness({ updates: [] });
+  h.tg.getUpdates = async () => [cb(1, `d:${keyOf(h)}`)];
+  assert.equal(JSON.parse(await h.run()).hookSpecificOutput.decision.behavior, 'deny');
+
+  const h2 = planHarness({ updates: [] });
+  h2.tg.getUpdates = async () => [cb(1, `l:${keyOf(h2)}`)];
+  assert.equal(await h2.run(), null);
+});
+
+test('runPlan: không đọc được nội dung plan → chỉ báo, KHÔNG nút, nhả về máy', async () => {
+  const h = planHarness({ updates: [], plan: '' });
+  assert.equal(await h.run(), null);
+  assert.equal(h.sent.length, 1);
+  assert.equal(h.sent[0].opts.reply_markup, undefined);
+  assert.match(h.sent[0].text, /có plan cần bạn duyệt/);
 });

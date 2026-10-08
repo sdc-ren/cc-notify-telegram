@@ -228,6 +228,20 @@ const STRINGS = {
     permNoRight: 'Bạn không có quyền duyệt yêu cầu này.',
     planNotice: (tag, provider = 'Claude Code') =>
       `📋 ${tag} ${provider} có plan cần bạn duyệt — mở ${provider} để đọc và chọn (Accept / Revise / Reject).`,
+    planHeader: (tag, provider = 'Claude Code') => `📋 ${tag} ${provider} có plan cần bạn duyệt:`,
+    planFooter:
+      '👇 Chọn bên dưới, hoặc REPLY tin này để góp ý / yêu cầu sửa plan — chỉ tài khoản trong allowlist mới thao tác được.',
+    btnPlanApprove: '✅ Duyệt (hỏi từng bước)',
+    btnPlanApproveEdits: '✅ Duyệt + tự sửa file',
+    btnPlanReject: '✏️ Chưa ổn',
+    planApproved: (who) => `✅ Đã duyệt plan${who} — Claude bắt đầu làm, mỗi thao tác sửa file vẫn hỏi.`,
+    planApprovedEdits: (who) => `✅ Đã duyệt plan${who} — Claude tự sửa file, không hỏi từng lần.`,
+    planRejected: (who) => `✏️ Đã yêu cầu sửa plan${who}.`,
+    planFeedbackSent: (who, text) => `✏️ Đã gửi góp ý${who}: "${text}"`,
+    planRejectReason:
+      'Người dùng CHƯA DUYỆT plan này qua Telegram (không kèm góp ý). Hãy giữ nguyên plan mode, hỏi lại người dùng cần chỉnh gì rồi sửa plan.',
+    planFeedbackReason: (text) =>
+      `Người dùng xem plan qua Telegram và CHƯA DUYỆT, góp ý: "${text}". Hãy giữ nguyên plan mode, chỉnh plan theo góp ý rồi trình lại.`,
   },
   en: {
     doneFallback: '— task completed',
@@ -266,6 +280,20 @@ const STRINGS = {
     permNoRight: 'You are not allowed to approve this request.',
     planNotice: (tag, provider = 'Claude Code') =>
       `📋 ${tag} ${provider} has a plan to review — open ${provider} to read and choose (Accept / Revise / Reject).`,
+    planHeader: (tag, provider = 'Claude Code') => `📋 ${tag} ${provider} has a plan for you to review:`,
+    planFooter:
+      '👇 Choose below, or REPLY to this message with feedback / requested changes — only allowlisted accounts can act.',
+    btnPlanApprove: '✅ Approve (ask per edit)',
+    btnPlanApproveEdits: '✅ Approve + auto-accept edits',
+    btnPlanReject: '✏️ Not yet',
+    planApproved: (who) => `✅ Plan approved${who} — Claude starts working, file edits still ask first.`,
+    planApprovedEdits: (who) => `✅ Plan approved${who} — Claude edits files without asking each time.`,
+    planRejected: (who) => `✏️ Asked for plan changes${who}.`,
+    planFeedbackSent: (who, text) => `✏️ Feedback sent${who}: "${text}"`,
+    planRejectReason:
+      'The user did NOT approve this plan via Telegram (no feedback given). Stay in plan mode, ask the user what to change, then revise the plan.',
+    planFeedbackReason: (text) =>
+      `The user reviewed the plan via Telegram and did NOT approve it. Feedback: "${text}". Stay in plan mode, revise the plan accordingly and present it again.`,
   },
 };
 
@@ -639,7 +667,7 @@ export function classifyUpdate(update, ctx) {
     if (String(cq.message?.chat?.id) !== String(ctx.chatId)) return { kind: 'ignore' };
     const messageId = cq.message?.message_id;
     if (messageId == null || !ctx.pending.flatMap(idsOf).includes(messageId)) return { kind: 'ignore' };
-    const action = String(cq.data || '').match(/^([adsl]):/)?.[1];
+    const action = String(cq.data || '').match(/^([adesl]):/)?.[1];
     if (!action) return { kind: 'ignore' };
     return {
       kind: 'callback',
@@ -661,14 +689,20 @@ export function classifyUpdate(update, ctx) {
   const replyTo = msg.reply_to_message?.message_id;
   if (replyTo != null) {
     if (!allIds.includes(replyTo)) return { kind: 'ignore' };
-    return { kind: 'reply', messageId: replyTo, text: msg.text.trim() };
+    return { kind: 'reply', messageId: replyTo, text: msg.text.trim(), fromId: msg.from?.id, fromName: msg.from?.first_name || msg.from?.username || '' };
   }
   if (msg.chat?.type === 'private') {
     if (asks.length === 1) {
       const freshEnough = (msg.date || 0) * 1000 >= asks[0].sentAt - 2000;
       if (!freshEnough) return { kind: 'ignore' };
       const ids = idsOf(asks[0]);
-      return { kind: 'reply', messageId: ids[ids.length - 1], text: msg.text.trim() };
+      return {
+        kind: 'reply',
+        messageId: ids[ids.length - 1],
+        text: msg.text.trim(),
+        fromId: msg.from?.id,
+        fromName: msg.from?.first_name || msg.from?.username || '',
+      };
     }
     if (asks.length > 1) return { kind: 'need-reply-hint' };
   }
@@ -805,7 +839,7 @@ async function waitForReply({ tg, cfg, dir, ownMessageIds, deadline, env, home, 
           // đọc dở → vòng sau
         }
         if (msg?.action) return { type: 'callback', action: msg.action, fromName: msg.fromName || '' };
-        if (msg?.text != null) return { type: 'reply', text: msg.text };
+        if (msg?.text != null) return { type: 'reply', text: msg.text, fromName: msg.fromName || '' };
       }
 
       // 2) trở thành poller trung tâm nếu chưa ai giữ lock
@@ -852,9 +886,14 @@ async function waitForReply({ tg, cfg, dir, ownMessageIds, deadline, env, home, 
             // session kia sẽ timeout → chấp nhận
           }
         } else if (verdict.kind === 'reply') {
-          if (ownMessageIds.includes(verdict.messageId)) return { type: 'reply', text: verdict.text };
+          // Reply vào tin PLAN là chỉ đạo thẳng cho agent → chỉ allowlist mới được góp ý.
+          const target = pending.find((p) => idsOf(p).includes(verdict.messageId));
+          if (target?.kind === 'plan' && !live.allowedUserIds.includes(String(verdict.fromId))) continue;
+          if (ownMessageIds.includes(verdict.messageId)) {
+            return { type: 'reply', text: verdict.text, fromName: verdict.fromName || '' };
+          }
           try {
-            writeFileSync(inboxPath(dir, verdict.messageId), JSON.stringify({ text: verdict.text }));
+            writeFileSync(inboxPath(dir, verdict.messageId), JSON.stringify({ text: verdict.text, fromName: verdict.fromName || '' }));
           } catch {
             // session kia sẽ timeout → chấp nhận
           }
@@ -1008,9 +1047,15 @@ async function sweepSessionPending(sessionId, cfg, tg, home = homedir()) {
 //          | { behavior:'deny', message?, interrupt? } } }
 // Không in gì = im lặng KHÔNG phải đồng ý — hộp thoại vẫn hiện tại máy.
 
-export function permOutput(behavior, { message } = {}) {
+export function permOutput(behavior, { message, updatedInput, updatedPermissions } = {}) {
   const decision =
-    behavior === 'deny' ? { behavior: 'deny', ...(message ? { message } : {}) } : { behavior: 'allow' };
+    behavior === 'deny'
+      ? { behavior: 'deny', ...(message ? { message } : {}) }
+      : {
+          behavior: 'allow',
+          ...(updatedInput ? { updatedInput } : {}),
+          ...(updatedPermissions ? { updatedPermissions } : {}),
+        };
   return JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision } });
 }
 
@@ -1078,6 +1123,43 @@ export function buildPermMessage({ toolName, toolInput, project, suffix, str, pr
   return [str.permHeader(tag, providerId ? providerDisplayName(providerId) : undefined), '', `🔧 ${toolName}`, detail || str.permNoDetail, '', str.permFooter].join('\n');
 }
 
+// --- Plan (ExitPlanMode): duyệt / góp ý qua Telegram ---
+
+// Nội dung plan nằm ở tool_input.plan. Không có (hoặc rỗng) thì KHÔNG dựng nút — duyệt mù là
+// điều tránh nhất — chỉ báo "có plan" rồi nhả về máy.
+export function planTextOf(toolInput) {
+  const plan = toolInput && typeof toolInput === 'object' ? toolInput.plan : '';
+  return typeof plan === 'string' ? plan.trim() : '';
+}
+
+export function buildPlanMessage({ plan, project, suffix, str, providerId }) {
+  const tag = buildTag({ providerId, project, suffix });
+  return [str.planHeader(tag, providerId ? providerDisplayName(providerId) : undefined), '', plan, '', str.planFooter].join('\n');
+}
+
+// `a` = duyệt, vẫn hỏi từng lần sửa file · `e` = duyệt + tự sửa file · `d` = chưa ổn · `l` = để máy.
+export function planKeyboard(key, str) {
+  return {
+    inline_keyboard: [
+      [{ text: str.btnPlanApprove, callback_data: `a:${key}` }],
+      [{ text: str.btnPlanApproveEdits, callback_data: `e:${key}` }],
+      [
+        { text: str.btnPlanReject, callback_data: `d:${key}` },
+        { text: str.btnLocal, callback_data: `l:${key}` },
+      ],
+    ],
+  };
+}
+
+// Duyệt plan = allow + thoát plan mode. Phải echo lại tool_input (updatedInput), nếu không
+// Claude Code bỏ qua quyết định allow và hộp thoại vẫn hiện.
+export function planApproveOutput(toolInput, mode) {
+  return permOutput('allow', {
+    updatedInput: toolInput && typeof toolInput === 'object' ? toolInput : {},
+    updatedPermissions: [{ type: 'setMode', mode, destination: 'session' }],
+  });
+}
+
 // callback_data giới hạn 64 byte của Telegram → prefix 1 ký tự + key 16 hex = 18 byte.
 export function permKeyboard(key, str, ttlMin) {
   return {
@@ -1118,13 +1200,7 @@ export function readSessionAllow(dir, sessionId, now = Date.now()) {
 
 const hhmm = (ts) => new Date(ts).toTimeString().slice(0, 5);
 
-// Tool KHÔNG hợp với nút Allow/Deny: lựa chọn thật cần đọc kỹ tại máy (Accept/Revise/Reject…),
-// và tool_input thường không chứa nội dung để duyệt. Ở chế độ thường ExitPlanMode đi kênh
-// riêng (requiresUserInteraction) nên KHÔNG tới hook này; giữ đây làm lớp phòng thủ cho các
-// chế độ mà nó lọt qua — khi đó chỉ BÁO "có plan", không dựng nút.
-const NOTIFY_ONLY_TOOLS = new Set(['ExitPlanMode']);
-
-// Tin báo gọn cho tool notify-only (không nút, nhả về máy để duyệt).
+// Tin báo gọn khi có plan nhưng KHÔNG đọc được nội dung (không nút, nhả về máy để duyệt).
 export function buildPlanNotice({ project, suffix, str, providerId }) {
   const tag = buildTag({ providerId, project, suffix });
   return str.planNotice(tag, providerId ? providerDisplayName(providerId) : undefined);
@@ -1140,6 +1216,9 @@ export async function promptTelegramPermission({
   toolInput,
   project,
   suffix,
+  kind = 'perm',
+  text,
+  keyboard,
 }) {
   if (!cfg.remote || !cfg.remotePermission) return { type: 'remote-off' };
   if (!cfg.allowedUserIds.length) return { type: 'no-allowed-users' };
@@ -1149,19 +1228,21 @@ export async function promptTelegramPermission({
   gcStateDir(dir);
 
   const sessionId = payload.session_id || '';
-  if (readSessionAllow(dir, sessionId)) return { type: 'session-allow', dir };
+  // Plan không bao giờ bị "cho phép tất cả" nuốt: duyệt plan luôn là quyết định riêng.
+  if (kind === 'perm' && readSessionAllow(dir, sessionId)) return { type: 'session-allow', dir };
 
   const str = strings(cfg);
   const key = pendingKey(sessionId, [{ question: `${toolName}:${JSON.stringify(toolInput ?? null)}` }]);
   const chunks = chunkMessage(
-    buildPermMessage({
-      toolName,
-      toolInput,
-      project,
-      suffix,
-      str,
-      providerId: cfg.providerId,
-    })
+    text ??
+      buildPermMessage({
+        toolName,
+        toolInput,
+        project,
+        suffix,
+        str,
+        providerId: cfg.providerId,
+      })
   );
 
   // Bàn phím nút gắn vào tin CUỐI. Gửi thiếu dù chỉ 1 chunk là nhả về máy: duyệt khi mới
@@ -1174,7 +1255,7 @@ export async function promptTelegramPermission({
       const sent = await tg.sendMessage(
         chunks[i],
         isAnchor
-          ? { reply_markup: permKeyboard(key, str, cfg.sessionAllowTtlMin), providerId: cfg.providerId }
+          ? { reply_markup: keyboard || permKeyboard(key, str, cfg.sessionAllowTtlMin), providerId: cfg.providerId }
           : { providerId: cfg.providerId }
       );
       if (!sent?.message_id) throw new Error('no message_id');
@@ -1195,7 +1276,7 @@ export async function promptTelegramPermission({
   writeFileSync(
     pendingPath(dir, key),
     JSON.stringify({
-      kind: 'perm',
+      kind,
       messageId: anchorId,
       messageIds,
       sessionId,
@@ -1224,6 +1305,58 @@ export async function promptTelegramPermission({
   return { type: 'ok', outcome, anchorId, key, dir };
 }
 
+export async function runPlan(payload, cfg, tg, env, home, str) {
+  const project = projectName(payload, env);
+  const suffix = String(payload.session_id || '').slice(-4);
+  const plan = planTextOf(payload.tool_input);
+
+  if (!plan) {
+    await tg
+      .sendMessage(buildPlanNotice({ project, suffix, str, providerId: cfg.providerId }), { providerId: cfg.providerId })
+      .catch(() => {});
+    return null;
+  }
+
+  const key = pendingKey(payload.session_id, [{ question: `ExitPlanMode:${plan}` }]);
+  const prompt = await promptTelegramPermission({
+    payload,
+    cfg,
+    tg,
+    env,
+    home,
+    toolName: 'ExitPlanMode',
+    toolInput: payload.tool_input,
+    project,
+    suffix,
+    kind: 'plan',
+    text: buildPlanMessage({ plan, project, suffix, str, providerId: cfg.providerId }),
+    keyboard: planKeyboard(key, str),
+  });
+  if (prompt.type !== 'ok') return null;
+  const { outcome, anchorId } = prompt;
+  const who = outcome.fromName ? ` (${outcome.fromName})` : '';
+
+  if (outcome.type === 'callback' && (outcome.action === 'a' || outcome.action === 'e')) {
+    const edits = outcome.action === 'e';
+    await tg.editMessageText(anchorId, edits ? str.planApprovedEdits(who) : str.planApproved(who)).catch(() => {});
+    return planApproveOutput(payload.tool_input, edits ? 'acceptEdits' : 'default');
+  }
+  if (outcome.type === 'callback' && outcome.action === 'd') {
+    await tg.editMessageText(anchorId, str.planRejected(who)).catch(() => {});
+    return permOutput('deny', { message: str.planRejectReason });
+  }
+  if (outcome.type === 'reply' && outcome.text && outcome.text.toLowerCase() !== 'local') {
+    await tg.editMessageText(anchorId, str.planFeedbackSent(who, capText(outcome.text, 300))).catch(() => {});
+    return permOutput('deny', { message: str.planFeedbackReason(outcome.text) });
+  }
+
+  // 'l' / reply "local" / remote-off / timeout → im lặng ⇒ hộp thoại plan hiện tại máy.
+  await tg
+    .editMessageText(anchorId, outcome.type === 'timeout' ? str.permTimedOut : str.permMovedLocal)
+    .catch(() => {});
+  return null;
+}
+
 async function runPerm(payload, cfg, tg, env, home = homedir()) {
   if (!cfg.remote || !cfg.remotePermission) return null;
   // FAIL-CLOSED: không khai báo ai được duyệt thì không hỏi từ xa, hộp thoại về máy.
@@ -1235,22 +1368,9 @@ async function runPerm(payload, cfg, tg, env, home = homedir()) {
 
   const str = strings(cfg);
 
-  // Plan (và tool notify-only khác): chỉ gửi 1 tin BÁO rồi nhả về máy — KHÔNG nút, KHÔNG pending,
-  // KHÔNG đụng session-allow (đặt trước readSessionAllow để "cho phép tất cả" không nuốt plan).
-  if (NOTIFY_ONLY_TOOLS.has(toolName)) {
-    await tg
-      .sendMessage(
-        buildPlanNotice({
-          project: projectName(payload, env),
-          suffix: String(payload.session_id || '').slice(-4),
-          str,
-          providerId: cfg.providerId,
-        }),
-        { providerId: cfg.providerId }
-      )
-      .catch(() => {});
-    return null;
-  }
+  // Plan: có nội dung → gửi kèm nút Duyệt / Chưa ổn + cho reply góp ý. Không có nội dung → chỉ
+  // BÁO rồi nhả về máy (không duyệt mù). Cả hai đều KHÔNG đụng session-allow.
+  if (toolName === 'ExitPlanMode') return runPlan(payload, cfg, tg, env, home, str);
 
   const prompt = await promptTelegramPermission({
     payload,

@@ -12,3 +12,5 @@ When you are truly blocked and need user intervention before continuing, end wit
 starting with `🛑` and add this marker:
 
 `<!-- AI_NOTIFY_ESCALATE -->`
+
+Also use it when you stop to wait for the user to choose a direction or confirm something (e.g. "which option?", "push now?"): without a marker nothing is sent, so the user would not know you are waiting. One short `🛑` line saying what you need is enough.

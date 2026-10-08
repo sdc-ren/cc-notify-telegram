@@ -20,3 +20,5 @@ Ví dụ: `<!-- CC_NOTIFY_DONE: Sửa hook gửi tóm tắt cô đọng | merged
 Khi BẾ TẮC thật sự — cần người dùng can thiệp mới tiếp tục được (không phải câu hỏi làm rõ
 thông thường) — kết thúc tin nhắn bằng một dòng bắt đầu bằng `🛑` mô tả ngắn việc cần người
 dùng làm, kèm marker `<!-- CC_NOTIFY_ESCALATE -->` trên dòng riêng.
+
+Cũng dùng ESCALATE khi bạn dừng để **chờ người dùng chọn hướng hoặc xác nhận** (vd "chọn phương án nào?", "commit và push luôn không?", "cần QC bổ sung") — Stop hook không gửi gì nếu thiếu marker nên người dùng sẽ không biết bạn đang chờ. Chỉ cần một dòng `🛑` ngắn nêu rõ cần gì.
