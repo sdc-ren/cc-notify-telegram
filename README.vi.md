@@ -335,7 +335,9 @@ cd cc-notify-telegram
 npm test        # node --test, không cần cài dependency
 ```
 
-Hãy thêm/cập nhật test khi đổi hành vi. CI chạy Node 22 và 26 trên Ubuntu, Node 26 trên macOS và Windows. Báo lỗ hổng bảo mật qua GitHub private security advisory, không mở issue công khai.
+Hãy thêm/cập nhật test khi đổi hành vi. CI chạy Node 22 và 26 trên Ubuntu, Node 26 trên macOS và Windows.
+
+Xem [CONTRIBUTING.md](CONTRIBUTING.md) (nguyên tắc, cấu trúc dự án) và [CHANGELOG.md](CHANGELOG.md) (những gì đã thay đổi). Lỗ hổng bảo mật báo riêng theo [SECURITY.md](SECURITY.md), không mở issue công khai. Dự án theo [Bộ quy tắc ứng xử](CODE_OF_CONDUCT.md).
 
 ## Giấy phép
 

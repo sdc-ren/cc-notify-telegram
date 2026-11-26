@@ -269,7 +269,7 @@ If a topic ID is wrong or the topic was deleted, messages fall back to the main 
 - The token lives only in `~/.config/ai-notify-telegram/config.json` (mode 600).
 - Approvals are authorized by Telegram `from.id` against `allowedUserIds`. Empty list means nobody.
 - Any failure, timeout or `local` choice returns control to the on-machine prompt. The tool never approves by itself.
-- Found a vulnerability? Please open a private security advisory on GitHub instead of a public issue.
+- Found a vulnerability? Report it privately as described in [SECURITY.md](SECURITY.md), not as a public issue.
 
 ## Uninstall
 
@@ -289,6 +289,8 @@ npm test        # node --test, no dependencies to install
 ```
 
 Please add or update tests for behavior changes. CI runs Node 22 and 26 on Ubuntu, and Node 26 on macOS and Windows.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the ground rules and project layout, and [CHANGELOG.md](CHANGELOG.md) for what changed. Report security problems privately as described in [SECURITY.md](SECURITY.md). This project follows a [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
