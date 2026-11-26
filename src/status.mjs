@@ -3,7 +3,15 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 
-import { isRemoteEnabled, isRemotePermEnabled, loadConfig, makeTelegram, hasCredentials } from '../hook/notify-telegram.mjs';
+import {
+  hasCredentials,
+  isRemoteEnabled,
+  isRemotePermEnabled,
+  isTokenError,
+  loadConfig,
+  makeTelegram,
+  networkErrorDetail,
+} from '../hook/notify-telegram.mjs';
 import { configPath } from './config.mjs';
 import { HOOK_ENTRIES } from './settings.mjs';
 import { hasBlock } from './snippet.mjs';
@@ -41,7 +49,17 @@ export async function runStatus({ home = homedir(), log = console.log } = {}) {
       const me = await makeTelegram(cfg).getMe();
       add(true, `Bot @${me.username} — token hợp lệ`);
     } catch (err) {
-      add(false, `getMe lỗi: ${err.message}`, 'token sai/hết hạn hoặc offline — kiểm tra @BotFather');
+      if (err.kind === 'network') {
+        add(
+          false,
+          `Không kết nối được Telegram: ${err.message}${networkErrorDetail(err)}`,
+          'lỗi mạng, KHÔNG phải token — kiểm tra mạng/VPN/proxy tới api.telegram.org rồi chạy lại'
+        );
+      } else if (isTokenError(err)) {
+        add(false, `getMe lỗi: ${err.message}`, 'token sai hoặc đã bị thu hồi — lấy token mới từ @BotFather rồi chạy lại init');
+      } else {
+        add(false, `getMe lỗi: ${err.message}`, 'xem thông báo lỗi của Telegram ở trên');
+      }
     }
   }
 
