@@ -1,0 +1,7 @@
+# No npm dependencies to update; keep the GitHub Actions used by CI current.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

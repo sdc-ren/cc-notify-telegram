@@ -1,0 +1,55 @@
+name: Bug report
+description: Something does not work as described.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! **Never paste your bot token or real chat IDs.**
+        Security problems go through [SECURITY.md](https://github.com/sdc-ren/cc-notify-telegram/blob/main/SECURITY.md), not here.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `cc-notify-telegram remote on`
+        2. Ask Claude to …
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: feature
+    attributes:
+      label: Feature
+      options:
+        - Done / 🛑 notifications
+        - Remote Ask (answer questions)
+        - Remote Permission (buttons)
+        - Plan review
+        - Away mode
+        - Installer / status / other CLI
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `cc-notify-telegram status`
+      description: It does not print your token.
+      render: text
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      placeholder: "claude 2.1.x · node 24.x · macOS 15"
+    validations:
+      required: true
