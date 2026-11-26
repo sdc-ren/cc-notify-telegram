@@ -8,6 +8,7 @@ import { configPath } from './config.mjs';
 import { HOOK_ENTRIES } from './settings.mjs';
 import { hasBlock } from './snippet.mjs';
 import { installPaths } from './init.mjs';
+import { isHookRuntimeInstalled, runtimeDir } from './hook-runtime.mjs';
 import { ProviderRegistry } from './providers/index.mjs';
 
 function extractNodePath(command) {
@@ -45,7 +46,7 @@ export async function runStatus({ home = homedir(), log = console.log } = {}) {
   }
 
   // Hook file
-  add(existsSync(paths.hookFile), `Hook: ${paths.hookFile}`, 'chạy lại init để copy hook');
+  add(isHookRuntimeInstalled(paths.hookFile), `Hook: ${paths.hookFile} + ${runtimeDir(paths.hookFile)}`, 'chạy lại init để copy hook');
 
   // Settings entries + node path còn tồn tại
   let settings = {};

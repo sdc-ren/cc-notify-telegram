@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { AgentProvider } from './base-provider.mjs';
+import { isHookRuntimeInstalled } from '../hook-runtime.mjs';
 import { HOOK_ENTRIES, isInstalled, mergeSettings, removeOurEntries } from '../settings.mjs';
 
 export class ClaudeProvider extends AgentProvider {
@@ -60,7 +61,7 @@ export class ClaudeProvider extends AgentProvider {
       };
     }
     const details = [
-      { ok: existsSync(paths.hookFile), label: `Hook file: ${paths.hookFile}`, fix: 'run init' },
+      { ok: isHookRuntimeInstalled(paths.hookFile), label: `Hook runtime: ${paths.hookFile}`, fix: 'run init' },
       ...HOOK_ENTRIES.map((spec) => ({
         ok: (settings?.hooks?.[spec.event] || []).some((group) =>
           (group.hooks || []).some((hook) => String(hook.command || '').includes('cc-notify-telegram.mjs'))
@@ -69,7 +70,7 @@ export class ClaudeProvider extends AgentProvider {
         fix: 'run init',
       })),
     ];
-    return { installed: isInstalled(settings) && existsSync(paths.hookFile), details };
+    return { installed: isInstalled(settings) && isHookRuntimeInstalled(paths.hookFile), details };
   }
 
   formatOutput(decision, event) {

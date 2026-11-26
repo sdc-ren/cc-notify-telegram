@@ -87,7 +87,7 @@ The first run downloads the repo, so it can take a few seconds. The wizard will:
 2. validate your bot token with `getMe`,
 3. auto-detect your chat ID (press Enter and pick from the chats the bot has seen),
 4. write `~/.config/ai-notify-telegram/config.json` (mode 600),
-5. copy the hook runtime to `~/.claude/hooks/cc-notify-telegram.mjs` and register hooks in each agent's config (`~/.claude/settings.json`, `~/.codex/config.json`, `~/.gemini/config/settings.json`),
+5. copy the hook runtime to `~/.claude/hooks/cc-notify-telegram/` (plus a small entry shim `~/.claude/hooks/cc-notify-telegram.mjs`) and register hooks in each agent's config (`~/.claude/settings.json`, `~/.codex/config.json`, `~/.gemini/config/settings.json`),
 6. optionally enable Remote Permission and detect the Telegram user IDs allowed to approve,
 7. ask before appending the instruction block to `CLAUDE.md` / `CODEX.md` / `AGENTS.md`,
 8. send a test message.
@@ -137,7 +137,7 @@ An alias is only available in interactive shells, not in scripts or CI. In those
 
 > **Convention in this README.** Examples are written as `cc-notify-telegram <command>`. If you did not set up a short command, use `npx -y github:sdc-ren/cc-notify-telegram <command>`; with the Option B alias, use `cc-notify <command>`.
 >
-> The installed hook is a *copy* in `~/.claude/hooks/`. After you update the CLI, re-run `cc-notify-telegram init` to refresh it.
+> The installed hook is a *copy* in `~/.claude/hooks/` (the `cc-notify-telegram.mjs` shim and the `cc-notify-telegram/` runtime folder). After you update the CLI, re-run `cc-notify-telegram init` to refresh it.
 
 ## Usage
 
