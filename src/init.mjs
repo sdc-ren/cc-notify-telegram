@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
 
-import { loadConfig, makeTelegram } from '../hook/notify-telegram.mjs';
+import { loadConfig, makeTelegram, networkErrorDetail } from '../hook/notify-telegram.mjs';
 import { installHookRuntime } from './hook-runtime.mjs';
 import { PROVIDERS, readConfig, readLegacyConf, writeConfig } from './config.mjs';
 import { findLegacyStopEntries, isInstalled, mergeSettings } from './settings.mjs';
@@ -157,8 +157,14 @@ export async function runInit(flags, { home = homedir(), log = console.log } = {
       botName = me.username ? `@${me.username}` : String(me.id);
       log(`✅ Token hợp lệ — bot ${botName}`);
     } catch (err) {
-      if (interactive) throw new Error(`Token không hợp lệ (getMe: ${err.message}). Chạy lại init.`);
-      log(`⚠️  Không xác thực được token (${err.message}) — vẫn tiếp tục (offline?).`);
+      if (err.kind === 'network') {
+        const reason = `${err.message}${networkErrorDetail(err)}`;
+        if (interactive) throw new Error(`Không kết nối được Telegram (${reason}) — kiểm tra mạng/VPN rồi chạy lại init.`);
+        log(`⚠️  Không kết nối được Telegram (${reason}) — chưa xác thực được token, vẫn tiếp tục.`);
+      } else {
+        if (interactive) throw new Error(`Token không hợp lệ (getMe: ${err.message}). Chạy lại init.`);
+        log(`⚠️  Không xác thực được token (${err.message}) — vẫn tiếp tục.`);
+      }
     }
 
     if (!chatId && interactive) chatId = await detectChatId(tgProbe, ask, log);

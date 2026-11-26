@@ -1,7 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { makeTelegram, TELEGRAM_API_TIMEOUT_MS } from '../hook/notify-telegram.mjs';
+import {
+  CONNECT_ATTEMPT_TIMEOUT_MS,
+  isTokenError,
+  makeTelegram,
+  networkErrorDetail,
+  TELEGRAM_API_TIMEOUT_MS,
+} from '../hook/notify-telegram.mjs';
 
 function fakeFetch(responses, calls) {
   return async (url, init) => {
@@ -117,4 +123,84 @@ test('makeTelegram.sendMessage: lỗi group upgraded hiển thị migrate_to_cha
   );
 
   await assert.rejects(() => tg.sendMessage('hello'), /migrate_to_chat_id: -1003760710918/);
+});
+
+test('makeTelegram: lỗi mạng gắn kind=network, giữ nguyên message gốc', async () => {
+  const tg = makeTelegram({ botToken: 'T', chatId: '-100' }, async () => {
+    const err = new TypeError('fetch failed');
+    err.cause = { code: 'UND_ERR_CONNECT_TIMEOUT' };
+    throw err;
+  });
+  const err = await tg.getMe().catch((e) => e);
+  assert.equal(err.kind, 'network');
+  assert.equal(err.message, 'fetch failed');
+  assert.equal(networkErrorDetail(err), ' (UND_ERR_CONNECT_TIMEOUT)');
+  assert.equal(isTokenError(err), false);
+});
+
+test('makeTelegram: 401 từ Telegram là lỗi token', async () => {
+  const calls = [];
+  const tg = makeTelegram(
+    { botToken: 'T', chatId: '-100' },
+    fakeFetch([{ ok: false, error_code: 401, description: 'Unauthorized' }], calls)
+  );
+  const err = await tg.getMe().catch((e) => e);
+  assert.equal(err.kind, 'api');
+  assert.equal(err.status, 401);
+  assert.equal(isTokenError(err), true);
+  assert.match(err.message, /telegram getMe failed: Unauthorized/);
+});
+
+test('makeTelegram: lỗi API khác (400) không bị coi là lỗi token', async () => {
+  const calls = [];
+  const tg = makeTelegram(
+    { botToken: 'T', chatId: '-100' },
+    fakeFetch([{ ok: false, error_code: 400, description: 'Bad Request: chat not found' }], calls)
+  );
+  const err = await tg.sendMessage('x').catch((e) => e);
+  assert.equal(err.kind, 'api');
+  assert.equal(isTokenError(err), false);
+});
+
+test('nạp telegram.mjs nới thời gian mỗi lần thử kết nối lên 2s', async () => {
+  const net = await import('node:net');
+  assert.equal(net.getDefaultAutoSelectFamilyAttemptTimeout(), CONNECT_ATTEMPT_TIMEOUT_MS);
+});
+
+test('makeTelegram: lỗi lúc kết nối thì thử lại đúng 1 lần', async () => {
+  let n = 0;
+  const tg = makeTelegram({ botToken: 'T', chatId: '-100' }, async () => {
+    n++;
+    if (n === 1) {
+      const err = new TypeError('fetch failed');
+      err.cause = { code: 'UND_ERR_CONNECT_TIMEOUT' };
+      throw err;
+    }
+    return { status: 200, json: async () => ({ ok: true, result: { username: 'bot' } }) };
+  });
+  assert.deepEqual(await tg.getMe(), { username: 'bot' });
+  assert.equal(n, 2);
+});
+
+test('makeTelegram: lỗi sau khi đã gửi request (socket đóng giữa chừng) không thử lại', async () => {
+  let n = 0;
+  const tg = makeTelegram({ botToken: 'T', chatId: '-100' }, async () => {
+    n++;
+    const err = new TypeError('fetch failed');
+    err.cause = { code: 'UND_ERR_SOCKET' };
+    throw err;
+  });
+  const err = await tg.sendMessage('x').catch((e) => e);
+  assert.equal(err.kind, 'network');
+  assert.equal(n, 1);
+});
+
+test('makeTelegram: hết timeout tổng thì không thử lại', async () => {
+  let n = 0;
+  const tg = makeTelegram({ botToken: 'T', chatId: '-100' }, async () => {
+    n++;
+    throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+  });
+  await assert.rejects(() => tg.getMe(), /timed out/);
+  assert.equal(n, 1);
 });

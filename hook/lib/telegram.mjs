@@ -1,28 +1,92 @@
 // Telegram API client (fetch built-in, timeout 30s, cho phép inject để test).
+
+import { setDefaultAutoSelectFamilyAttemptTimeout } from 'node:net';
+
 export const TELEGRAM_API_TIMEOUT_MS = 30_000;
+export const CONNECT_ATTEMPT_TIMEOUT_MS = 2_000;
+
+// Node thử IPv6 rồi IPv4 (Happy Eyeballs), mỗi lần mặc định chỉ ~250ms. Mạng có IPv6 hỏng mà
+// IPv4 chậm thì cả hai lần đều bị cắt → "fetch failed" dù curl vẫn vào được. Nới mỗi lần lên 2s.
+// Chỉ ảnh hưởng tiến trình hook/CLI này.
+try {
+  setDefaultAutoSelectFamilyAttemptTimeout(CONNECT_ATTEMPT_TIMEOUT_MS);
+} catch {
+  // Node quá cũ không có API này — giữ mặc định.
+}
+
+// Gắn loại lỗi để nơi gọi (status, init) báo đúng nguyên nhân:
+//   kind 'network' — không tới được api.telegram.org (timeout, DNS, mạng/VPN/proxy)
+//   kind 'api'     — Telegram trả lời ok:false (status = error_code, vd 401 token sai)
+function tagError(err, kind, status) {
+  err.kind = kind;
+  if (status != null) err.status = status;
+  return err;
+}
+
+export function networkErrorDetail(err) {
+  const code = err?.cause?.code || err?.code;
+  return typeof code === 'string' && !String(err?.message || '').includes(code) ? ` (${code})` : '';
+}
+
+// Lỗi xảy ra trước khi request tới được Telegram → thử lại không thể gửi trùng tin.
+const CONNECT_PHASE_CODES = new Set([
+  'UND_ERR_CONNECT_TIMEOUT',
+  'ECONNREFUSED',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'ETIMEDOUT',
+  'ENOTFOUND',
+  'EAI_AGAIN',
+]);
+
+export function isConnectPhaseError(err) {
+  if (err?.name === 'TimeoutError') return false;
+  const code = err?.cause?.code || err?.code;
+  if (CONNECT_PHASE_CODES.has(code)) return true;
+  // Happy Eyeballs hết mọi địa chỉ: AggregateError gom lỗi từng lần thử kết nối (kể cả
+  // ECONNRESET của IPv6 hỏng) — vẫn là pha kết nối. ECONNRESET đứng riêng thì không chắc nên bỏ qua.
+  const nested = err?.cause?.errors;
+  return err?.cause?.name === 'AggregateError' || (Array.isArray(nested) && nested.length > 0);
+}
+
+export function isTokenError(err) {
+  return err?.kind === 'api' && (err.status === 401 || err.status === 404);
+}
 
 export function makeTelegram(cfg, fetchFn = fetch) {
   const base = `https://api.telegram.org/bot${cfg.botToken}`;
   async function call(method, params, timeoutMs = TELEGRAM_API_TIMEOUT_MS) {
-    let res;
-    try {
-      res = await fetchFn(`${base}/${method}`, {
+    const request = () =>
+      fetchFn(`${base}/${method}`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(params),
         signal: AbortSignal.timeout(timeoutMs),
       });
+    let res;
+    try {
+      try {
+        res = await request();
+      } catch (err) {
+        // Kết nối đầu tiên hay rớt khi IPv6 hỏng (xem trên) — thử lại đúng 1 lần.
+        if (!isConnectPhaseError(err)) throw err;
+        res = await request();
+      }
     } catch (err) {
       if (err?.name === 'TimeoutError' || String(err?.message || '').includes('aborted due to timeout')) {
-        throw new Error(`telegram ${method} timed out after ${Math.round(timeoutMs / 1000)}s`);
+        throw tagError(new Error(`telegram ${method} timed out after ${Math.round(timeoutMs / 1000)}s`), 'network');
       }
-      throw err;
+      throw tagError(err, 'network');
     }
     const data = await res.json();
     if (!data.ok) {
       const migrate = data.parameters?.migrate_to_chat_id;
-      throw new Error(
-        `telegram ${method} failed: ${data.description || res.status}${migrate ? ` (migrate_to_chat_id: ${migrate})` : ''}`
+      throw tagError(
+        new Error(
+          `telegram ${method} failed: ${data.description || res.status}${migrate ? ` (migrate_to_chat_id: ${migrate})` : ''}`
+        ),
+        'api',
+        data.error_code ?? res.status
       );
     }
     return data.result;
