@@ -4,19 +4,18 @@
 // Non-interactive: --token <t> --chat-id <id> [--thread-id N] [--lang vi|en]
 //                  [--silent] [--yes] [--no-claude-md] [--no-test] [--keep-legacy]
 
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
 
 import { loadConfig, makeTelegram } from '../hook/notify-telegram.mjs';
+import { installHookRuntime } from './hook-runtime.mjs';
 import { PROVIDERS, readConfig, readLegacyConf, writeConfig } from './config.mjs';
 import { findLegacyStopEntries, isInstalled, mergeSettings } from './settings.mjs';
 import { hasBlock, upsertBlock } from './snippet.mjs';
 import { ProviderRegistry } from './providers/index.mjs';
-
-const HOOK_SOURCE = fileURLToPath(new URL('../hook/notify-telegram.mjs', import.meta.url));
 
 export function installPaths(home = homedir()) {
   const claude = join(home, '.claude');
@@ -227,10 +226,8 @@ export async function runInit(flags, { home = homedir(), log = console.log } = {
     log(`✅ Config → ${configFile} (chmod 600)`);
 
     // ── 2. Copy hook runtime ──────────────────────────────────────────────────
-    mkdirSync(join(paths.claude, 'hooks'), { recursive: true });
-    copyFileSync(HOOK_SOURCE, paths.hookFile);
-    if (process.platform !== 'win32') chmodSync(paths.hookFile, 0o755);
-    log(`✅ Hook → ${paths.hookFile}`);
+    const runtime = installHookRuntime(paths.hookFile);
+    log(`✅ Hook → ${paths.hookFile} (runtime: ${runtime})`);
 
     // ── 3. Merge settings.json (backup trước khi ghi) ────────────────────────
     const settings = readSettingsOrThrow(paths.settingsFile);

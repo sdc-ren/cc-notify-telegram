@@ -93,7 +93,7 @@ Lần chạy đầu phải tải repo nên mất vài giây. Wizard dẫn từng
 3. **Chat ID** — bấm Enter để wizard **tự dò** các chat/topic bot vừa thấy và chọn từ danh sách (hoặc gõ thẳng ID nếu đã biết).
 4. Wizard tự làm phần còn lại:
    - ghi config vào `~/.config/ai-notify-telegram/config.json` (chmod 600, tự chuyển đổi từ config `~/.claude/` cũ nếu có),
-   - copy hook runtime vào `~/.claude/hooks/cc-notify-telegram.mjs`,
+   - copy hook runtime vào `~/.claude/hooks/cc-notify-telegram/` (kèm shim `~/.claude/hooks/cc-notify-telegram.mjs` mà settings trỏ tới),
    - đăng ký hooks vào cấu hình từng Agent (`~/.claude/settings.json`, `~/.codex/config.json`, `~/.gemini/config/settings.json`),
    - hỏi có bật **Remote Permission** không (mặc định *không*); đồng ý thì dò luôn Telegram user ID được phép duyệt,
    - hỏi trước khi thêm block hướng dẫn marker vào `CLAUDE.md`, `CODEX.md`, `AGENTS.md`,
@@ -145,7 +145,7 @@ Alias chỉ có trong shell tương tác, không dùng được trong script hay
 
 > **Quy ước trong README.** Ví dụ viết dạng `cc-notify-telegram <lệnh>`. Nếu chưa tạo lệnh ngắn, dùng `npx -y github:sdc-ren/cc-notify-telegram <lệnh>`; nếu dùng alias Cách B, dùng `cc-notify <lệnh>`.
 >
-> Hook đã cài là một **bản sao** trong `~/.claude/hooks/`. Sau khi cập nhật CLI, chạy lại `cc-notify-telegram init` để làm mới nó.
+> Hook đã cài là một **bản sao** trong `~/.claude/hooks/` (shim `cc-notify-telegram.mjs` + thư mục runtime `cc-notify-telegram/`). Sau khi cập nhật CLI, chạy lại `cc-notify-telegram init` để làm mới nó.
 
 ## Sử dụng
 

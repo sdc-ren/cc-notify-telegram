@@ -5,6 +5,7 @@ import { copyFileSync, existsSync, readFileSync, rmSync, unlinkSync, writeFileSy
 import { homedir } from 'node:os';
 
 import { legacyStateDir, stateDir } from '../hook/notify-telegram.mjs';
+import { removeHookRuntime } from './hook-runtime.mjs';
 import { configPath, legacyConfigPath } from './config.mjs';
 import { installPaths } from './init.mjs';
 import { removeOurEntries } from './settings.mjs';
@@ -39,10 +40,7 @@ export async function runUninstall(flags, { home = homedir(), log = console.log 
     }
   }
 
-  if (existsSync(paths.hookFile)) {
-    unlinkSync(paths.hookFile);
-    log(`✅ Đã xoá ${paths.hookFile}`);
-  }
+  for (const removed of removeHookRuntime(paths.hookFile)) log(`✅ Đã xoá ${removed}`);
 
   if (flags.purge) {
     for (const cfgFile of [configPath(home), legacyConfigPath(home)]) {
