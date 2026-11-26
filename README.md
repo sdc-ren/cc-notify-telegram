@@ -212,6 +212,7 @@ answer returned to Claude → it continues
 | `init` *(default)* | Install, reinstall or reconfigure |
 | `test` | Send a test message |
 | `status` | Health check of the whole notify chain, with how to fix each problem |
+| `topics` | List the group's topic IDs the bot has seen recently (for `threadId`) |
 | `remote on\|off` | Toggle Remote Ask |
 | `remote-perm on\|off` | Toggle Remote Permission (and plan review) |
 | `uninstall [--purge]` | Remove hooks. `--purge` also removes config/token, state and the `CLAUDE.md` block |
@@ -243,7 +244,7 @@ If your group has Topics (forum mode), send everything to one topic by setting `
 To find topic IDs, mention the bot once in each topic, then list what it saw:
 
 ```bash
-node -e "import('node:fs').then(async fs=>{const p=process.env.HOME+'/.config/ai-notify-telegram/config.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));const r=await fetch('https://api.telegram.org/bot'+c.botToken+'/getUpdates',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({offset:-100,timeout:0,allowed_updates:['message','callback_query']})});const j=await r.json();const out=[];for(const u of j.result||[]){const m=u.message||u.callback_query?.message;if(String(m?.chat?.id)===String(c.chatId)&&m.message_thread_id!=null)out.push({message_thread_id:m.message_thread_id,text:m.text||''});}console.log(JSON.stringify(out,null,2));})"
+cc-notify-telegram topics
 ```
 
 If a topic ID is wrong or the topic was deleted, messages fall back to the main chat so nothing is lost.

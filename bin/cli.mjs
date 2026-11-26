@@ -9,6 +9,7 @@ import { hasCredentials, loadConfig, makeTelegram, strings } from '../hook/notif
 import { runInit } from '../src/init.mjs';
 import { runRemote } from '../src/remote.mjs';
 import { runStatus } from '../src/status.mjs';
+import { runTopics } from '../src/topics.mjs';
 import { runUninstall } from '../src/uninstall.mjs';
 
 // providers/provider: cờ cũ thời multi-provider — vẫn nhận (để không nuốt nhầm arg sau nó) nhưng bỏ qua.
@@ -53,6 +54,7 @@ Cách dùng:
   npx -y github:sdc-ren/cc-notify-telegram [init]     Wizard cài đặt (token, chat ID, hooks, CLAUDE.md)
   npx -y github:sdc-ren/cc-notify-telegram test       Gửi tin test
   npx -y github:sdc-ren/cc-notify-telegram status     Kiểm tra sức khoẻ toàn chuỗi notify
+  npx -y github:sdc-ren/cc-notify-telegram topics     Liệt kê topic ID của group (để đặt threadId)
   npx -y github:sdc-ren/cc-notify-telegram remote on  Bật Remote Ask (trả lời câu hỏi của Claude qua Telegram)
   npx -y github:sdc-ren/cc-notify-telegram remote off Tắt Remote Ask (câu hỏi hiện tại máy)
   npx -y github:sdc-ren/cc-notify-telegram remote-perm on|off
@@ -95,6 +97,8 @@ async function main() {
     }
     case 'status':
       return runStatus({});
+    case 'topics':
+      return runTopics();
     // Arg thứ 3 (vd `remote on claude` thời multi-provider) được chấp nhận và bỏ qua.
     case 'remote':
       return runRemote(flags._[1]);

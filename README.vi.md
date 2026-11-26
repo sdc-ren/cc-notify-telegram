@@ -186,10 +186,10 @@ Nếu Telegram group bật **Topics/Forum**, bạn có thể gửi toàn bộ ti
 Cách lấy `message_thread_id` khi đã có topic:
 
 1. Vào topic muốn dùng, mention bot một tin, ví dụ `@your_bot topic`.
-2. Chạy đoạn dưới để liệt kê topic ID bot vừa thấy:
+2. Liệt kê topic ID bot vừa thấy:
 
 ```bash
-node -e "import('node:fs').then(async fs=>{const p=process.env.HOME+'/.config/ai-notify-telegram/config.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));const r=await fetch('https://api.telegram.org/bot'+c.botToken+'/getUpdates',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({offset:-100,timeout:0,allowed_updates:['message','callback_query']})});const j=await r.json();const out=[];for(const u of j.result||[]){const m=u.message||u.callback_query?.message;if(String(m?.chat?.id)===String(c.chatId)&&m.message_thread_id!=null)out.push({message_thread_id:m.message_thread_id,text:m.text||''});}console.log(JSON.stringify(out,null,2));})"
+cc-notify-telegram topics
 ```
 
 3. Ghi ID đó vào `threadId` trong `~/.config/ai-notify-telegram/config.json`.
@@ -271,6 +271,7 @@ trả decision allow/deny về Claude → lệnh chạy / bị chặn
 | `cc-notify-telegram` *(hoặc `init`)* | Wizard cài đặt / cài lại / đổi config |
 | `cc-notify-telegram test` | Gửi tin test |
 | `cc-notify-telegram status` | Doctor: kiểm tra từng mắt xích của chuỗi notify, kèm cách sửa |
+| `cc-notify-telegram topics` | Liệt kê topic ID của group mà bot vừa thấy (để đặt `threadId`) |
 | `cc-notify-telegram remote on\|off` | Bật/tắt Remote Ask |
 | `cc-notify-telegram remote-perm on\|off` | Bật/tắt Remote Permission (và duyệt plan) |
 | `cc-notify-telegram uninstall` | Gỡ hooks (`--purge`: xoá cả config/token, state, block trong `CLAUDE.md`) |
