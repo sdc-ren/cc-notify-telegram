@@ -1,8 +1,7 @@
-// Duyệt plan (ExitPlanMode): rút gọn plan, câu hỏi mở, nút duyệt.
+// Duyệt plan (ExitPlanMode): rút gọn plan thành các bước chính, nút duyệt.
 
 import { buildTag, projectName } from './strings.mjs';
 import { pendingKey } from './state.mjs';
-import { isLocalKeyword } from './poller.mjs';
 import { capText, permOutput, promptTelegramPermission } from './perm.mjs';
 
 // Nội dung plan nằm ở tool_input.plan. Không có (hoặc rỗng) thì KHÔNG dựng nút — duyệt mù là
@@ -19,14 +18,7 @@ export function planTextOf(toolInput) {
 const PLAN_STEP_HEADING = /bước|cách làm|step|implementation|approach|thực hiện|kế hoạch|tasks?/i;
 
 const PLAN_SKIP_HEADING =
-  /context|bối cảnh|file|phạm vi|scope|thay đổi|changes?|critical|kiểm chứng|verif|test|out of scope|rủi ro|risk|ghi chú|note|lưu ý|why|vì sao|tóm tắt|summary/i;
-
-// Mục câu hỏi mở: phải được hỏi (đầy đủ) trước khi dựng lại plan.
-// (gồm cả "quyết định cần chốt" / "decisions needed"; KHÔNG khớp "quyết định thiết kế" đã chốt sẵn.)
-const PLAN_QUESTION_HEADING =
-  /câu hỏi|open question|questions?|cần làm rõ|chưa rõ|clarif|unresolved|cần xác nhận|điểm mở|quyết định cần|cần quyết định|cần chốt|chưa chốt|cần bạn (?:chọn|quyết)|decisions? (?:needed|to (?:be )?(?:made|decided|confirmed?))|needs? decision|to decide|undecided|tbd|pending decision/i;
-
-const PLAN_NO_QUESTIONS = /^(?:[-*+•\s]*)(?:không(?: có)?|chưa có|none|n\/a|no(?:ne)?|nothing|—|-)\.?\s*$/i;
+  /context|bối cảnh|file|phạm vi|scope|thay đổi|changes?|critical|kiểm chứng|verif|test|out of scope|rủi ro|risk|ghi chú|note|lưu ý|why|vì sao|tóm tắt|summary|câu hỏi|question|quyết định|decision/i;
 
 const PLAN_FILE_EXT = 'mjs|cjs|js|jsx|ts|tsx|json|md|py|sh|yml|yaml|css|html|toml|sql|vue|go|rs|java|rb|php|lock|env';
 
@@ -118,23 +110,13 @@ function parsePlanSections(plan) {
   return { title, sections };
 }
 
-// Câu hỏi mở trong plan (NGUYÊN VĂN, đầy đủ) — '' nếu không có hoặc ghi "không có".
-export function extractOpenQuestions(plan) {
-  const { sections } = parsePlanSections(plan);
-  const blocks = sections
-    .filter((s) => PLAN_QUESTION_HEADING.test(s.heading))
-    .map((s) => s.lines.join('\n').trim())
-    .filter((text) => text && !PLAN_NO_QUESTIONS.test(text));
-  return blocks.join('\n\n');
-}
-
 // plan markdown dài → { title, steps[], total }: TẤT CẢ các bước chính (ngắn), không đường dẫn
-// file, không việc "sửa file nào" (thuộc phạm vi thay đổi), không câu hỏi mở.
+// file, không việc "sửa file nào" (thuộc phạm vi thay đổi). Câu hỏi mở không thuộc tin này: snippet
+// CLAUDE.md bắt Claude hỏi bằng AskUserQuestion TRƯỚC khi trình plan.
 export function condensePlan(plan, { maxSteps = 30, maxStepChars = 120 } = {}) {
   const { title, sections } = parsePlanSections(plan);
   const isSkipped = (s) => PLAN_SKIP_HEADING.test(s.heading) && !PLAN_STEP_HEADING.test(s.heading);
-  const isQuestion = (s) => PLAN_QUESTION_HEADING.test(s.heading);
-  const withItems = sections.filter((s) => s.items.length && !isQuestion(s));
+  const withItems = sections.filter((s) => s.items.length);
   const stepSections = withItems.filter((s) => PLAN_STEP_HEADING.test(s.heading));
   const numbered = withItems.filter((s) => s.numbered);
   const chosen = stepSections.length
@@ -169,20 +151,6 @@ export function buildPlanMessage({ plan, project, suffix, str, detail = 'summary
   return [header, '', ...(title ? [`📌 ${title}`, ''] : []), ...body, '', str.planFooter].join('\n');
 }
 
-// Plan còn câu hỏi mở: gửi ĐẦY ĐỦ câu hỏi, xin trả lời trước khi dựng lại plan.
-export function buildPlanQuestionsMessage({ questions, project, suffix, str }) {
-  return [str.planQuestionsHeader(buildTag({ project, suffix })), '', questions, '', str.planQuestionsFooter].join('\n');
-}
-
-export function planQuestionsKeyboard(key, str) {
-  return {
-    inline_keyboard: [
-      [{ text: str.btnPlanDecideSelf, callback_data: `c:${key}` }],
-      [{ text: str.btnLocal, callback_data: `l:${key}` }],
-    ],
-  };
-}
-
 // `a` = duyệt, vẫn hỏi từng lần sửa file · `e` = duyệt + tự sửa file · `d` = chưa ổn · `l` = để máy.
 export function planKeyboard(key, str) {
   return {
@@ -211,41 +179,6 @@ export function buildPlanNotice({ project, suffix, str }) {
   return str.planNotice(buildTag({ project, suffix }));
 }
 
-async function runPlanQuestions({ payload, cfg, tg, env, home, str, project, suffix, plan, questions }) {
-  const key = pendingKey(payload.session_id, [{ question: `ExitPlanMode:questions:${plan}` }]);
-  const prompt = await promptTelegramPermission({
-    payload,
-    cfg,
-    tg,
-    env,
-    home,
-    toolName: 'ExitPlanMode',
-    toolInput: payload.tool_input,
-    project,
-    suffix,
-    kind: 'plan',
-    text: buildPlanQuestionsMessage({ questions, project, suffix, str }),
-    keyboard: planQuestionsKeyboard(key, str),
-  });
-  if (prompt.type !== 'ok') return null;
-  const { outcome, anchorId } = prompt;
-  const who = outcome.fromName ? ` (${outcome.fromName})` : '';
-
-  if (outcome.type === 'callback' && outcome.action === 'c') {
-    await tg.editMessageText(anchorId, str.planDecideSelf(who)).catch(() => {});
-    return permOutput('deny', { message: str.planDecideSelfReason });
-  }
-  if (outcome.type === 'reply' && outcome.text && !isLocalKeyword(outcome.text)) {
-    await tg.editMessageText(anchorId, str.planAnswered(who, capText(outcome.text, 300))).catch(() => {});
-    return permOutput('deny', { message: str.planAnswersReason(outcome.text) });
-  }
-  // 'l' / reply "local" / remote-off / timeout → hộp thoại plan hiện tại máy như bình thường.
-  await tg
-    .editMessageText(anchorId, outcome.type === 'timeout' ? str.permTimedOut : str.permMovedLocal)
-    .catch(() => {});
-  return null;
-}
-
 export async function runPlan(payload, cfg, tg, env, home, str) {
   const project = projectName(payload, env);
   const suffix = String(payload.session_id || '').slice(-4);
@@ -254,12 +187,6 @@ export async function runPlan(payload, cfg, tg, env, home, str) {
   if (!plan) {
     await tg.sendMessage(buildPlanNotice({ project, suffix, str })).catch(() => {});
     return null;
-  }
-
-  // Còn câu hỏi mở → hỏi (đầy đủ) trước; chưa gửi bản tóm tắt các bước khi plan chưa chốt.
-  const questions = extractOpenQuestions(plan);
-  if (questions && cfg.planDetail !== 'full') {
-    return runPlanQuestions({ payload, cfg, tg, env, home, str, project, suffix, plan, questions });
   }
 
   const key = pendingKey(payload.session_id, [{ question: `ExitPlanMode:${plan}` }]);

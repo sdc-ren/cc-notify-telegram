@@ -14,9 +14,7 @@ import {
   chunkMessage,
   classifyUpdate,
   closeOnSignal,
-  buildPlanQuestionsMessage,
   condensePlan,
-  extractOpenQuestions,
   denyOutput,
   describePermission,
   extractDoneSummary,
@@ -888,17 +886,6 @@ const PLAN_WITH_QUESTIONS = [
   '- app/(admin)/reports/page.tsx',
 ].join('\n');
 
-test('extractOpenQuestions: lấy NGUYÊN VĂN mục câu hỏi mở (kèm phương án con); không có / "Không có" → rỗng', () => {
-  const q = extractOpenQuestions(PLAN_WITH_QUESTIONS);
-  assert.match(q, /1\. Doanh thu tính theo giờ UTC hay giờ cửa hàng\?/);
-  assert.match(q, /- A: UTC/);
-  assert.match(q, /2\. Có cần xuất Excel không\?/);
-  assert.doesNotMatch(q, /route\.ts|Các bước/);
-  assert.equal(extractOpenQuestions(LONG_PLAN), '');
-  assert.equal(extractOpenQuestions('# P\n## Open questions\nNone\n## Steps\n- a b c'), '');
-  assert.equal(extractOpenQuestions('# P\n## Câu hỏi mở\n- Không có\n'), '');
-});
-
 test('condensePlan: câu hỏi mở và phạm vi thay đổi KHÔNG lọt vào các bước; bước chỉ-sửa-file bị bỏ', () => {
   const { steps } = condensePlan(PLAN_WITH_QUESTIONS);
   assert.deepEqual(steps, ['Dựng bảng doanh thu theo ngày', 'Viết API trả về tổng theo ngày', 'Làm trang biểu đồ']);
@@ -911,55 +898,16 @@ test('condensePlan: liệt kê HẾT các bước (không cắt ở 8)', () => {
   assert.equal(condensePlan(plan).steps.length, 15);
 });
 
-test('buildPlanQuestionsMessage: có tag, đủ câu hỏi, hướng dẫn reply', () => {
-  const msg = buildPlanQuestionsMessage({ questions: extractOpenQuestions(PLAN_WITH_QUESTIONS), project: 'shop', suffix: 'ab12', str });
-  assert.match(msg, /^❓ \[shop · ab12\] Claude Code có câu hỏi mở/);
-  assert.match(msg, /- B: giờ cửa hàng/);
-  assert.match(msg, /REPLY/);
-});
-
-test('runPlan có câu hỏi mở: reply → deny kèm câu trả lời nguyên văn; KHÔNG gửi bản tóm tắt bước', async () => {
+test('runPlan: plan có mục câu hỏi mở vẫn đi luồng duyệt bình thường (tóm tắt các bước + 4 nút)', async () => {
   const h = planHarness({ updates: [], plan: PLAN_WITH_QUESTIONS });
-  h.tg.getUpdates = async () => [
-    {
-      update_id: 1,
-      message: { chat: { id: 7, type: 'supergroup' }, text: '1A, 2: không', date: Math.floor(Date.now() / 1000), from: { id: 111, first_name: 'Sơn' }, reply_to_message: { message_id: 101 } },
-    },
-  ];
-  const out = JSON.parse(await h.run()).hookSpecificOutput.decision;
-  assert.equal(out.behavior, 'deny');
-  assert.match(out.message, /1A, 2: không/);
-  assert.match(out.message, /BỎ mục câu hỏi mở/);
-  assert.match(h.sent[0].text, /^❓/);
-  assert.doesNotMatch(h.sent[0].text, /Dựng bảng doanh thu/);
-  assert.deepEqual(h.sent[0].opts.reply_markup.inline_keyboard.flat().map((b) => b.callback_data.split(':')[0]).sort(), ['c', 'l']);
-});
-
-test('runPlan có câu hỏi mở: "Claude tự quyết" → deny; "Để máy xử lý" → null', async () => {
-  const h = planHarness({ updates: [], plan: PLAN_WITH_QUESTIONS });
-  h.tg.getUpdates = async () => [cb(1, `c:${keyOf(h)}`)];
-  const out = JSON.parse(await h.run()).hookSpecificOutput.decision;
-  assert.equal(out.behavior, 'deny');
-  assert.match(out.message, /TỰ QUYẾT/);
-
-  const h2 = planHarness({ updates: [], plan: PLAN_WITH_QUESTIONS });
-  h2.tg.getUpdates = async () => [cb(1, `l:${keyOf(h2)}`)];
-  assert.equal(await h2.run(), null);
-});
-
-test('runPlan: plan không còn câu hỏi mở → luồng duyệt bình thường (tóm tắt các bước + 4 nút)', async () => {
-  const h = planHarness({ updates: [], plan: LONG_PLAN });
   h.tg.getUpdates = async () => [cb(1, `a:${keyOf(h)}`)];
   assert.equal(JSON.parse(await h.run()).hookSpecificOutput.decision.behavior, 'allow');
   assert.match(h.sent[0].text, /^📋/);
-  assert.match(h.sent[0].text, /1\. Tạo bảng daily_sales/);
+  assert.match(h.sent[0].text, /1\. Dựng bảng doanh thu theo ngày/);
+  assert.doesNotMatch(h.sent[0].text, /UTC/);
 });
 
-test('extractOpenQuestions: mục "Quyết định cần chốt" / "Decisions needed" cũng được hỏi; "quyết định thiết kế" thì không', () => {
-  assert.match(extractOpenQuestions('# P\n## Các bước\n1. A b c\n## Quyết định cần chốt\n- Dùng Postgres hay SQLite?\n'), /Postgres hay SQLite/);
-  assert.match(extractOpenQuestions('# P\n## Decisions needed\n1. Which auth provider?\n'), /Which auth provider/);
-  assert.match(extractOpenQuestions('# P\n## TBD\n- retention period\n'), /retention period/);
-  assert.equal(extractOpenQuestions('# P\n## Quyết định thiết kế\n- Đã chọn Postgres vì ổn định\n'), '');
-  // và không lọt vào danh sách bước
+test('condensePlan: mục câu hỏi mở / quyết định cần chốt không lọt vào danh sách bước', () => {
   assert.deepEqual(condensePlan('## Các bước\n1. Làm việc một\n## Quyết định cần chốt\n- Dùng Postgres hay SQLite?\n').steps, ['Làm việc một']);
+  assert.deepEqual(condensePlan('# P\n- Làm việc một\n## Câu hỏi mở\n- Dùng Postgres hay SQLite?\n').steps, ['Làm việc một']);
 });

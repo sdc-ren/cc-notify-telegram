@@ -24,7 +24,7 @@ export function classifyUpdate(update, ctx) {
   if (cq) {
     if (String(cq.message?.chat?.id) !== String(ctx.chatId)) return { kind: 'ignore' };
     const messageId = cq.message?.message_id;
-    const action = String(cq.data || '').match(/^([adescl]):/)?.[1];
+    const action = String(cq.data || '').match(/^([adesl]):/)?.[1];
     if (messageId == null || !action) return { kind: 'ignore' };
     // Nút của một yêu cầu không còn chờ nữa (đã xử lý tại máy / hủy / hết hạn) → báo cho người bấm.
     if (!ctx.pending.flatMap(idsOf).includes(messageId)) {

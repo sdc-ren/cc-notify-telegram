@@ -45,15 +45,6 @@ const STRINGS = {
     planNotice: (tag) =>
       `📋 ${tag} Claude Code có plan cần bạn duyệt — mở Claude Code để đọc và chọn (Accept / Revise / Reject).`,
     planHeader: (tag) => `📋 ${tag} Claude Code có plan cần bạn duyệt:`,
-    planQuestionsHeader: (tag) => `❓ ${tag} Claude Code có câu hỏi mở trong plan — cần bạn trả lời trước khi dựng lại plan:`,
-    planQuestionsFooter: '↩️ REPLY tin này để trả lời (vd "1A, 2: có" hoặc mô tả tự do), hoặc bấm nút bên dưới.',
-    btnPlanDecideSelf: '🤖 Claude tự quyết',
-    planAnswered: (who, text) => `✅ Đã gửi câu trả lời${who}: "${text}"`,
-    planDecideSelf: (who) => `🤖 Để Claude tự quyết các câu hỏi mở${who}.`,
-    planAnswersReason: (text) =>
-      `Người dùng trả lời các CÂU HỎI MỞ của plan qua Telegram: "${text}". Hãy giữ nguyên plan mode, cập nhật plan theo câu trả lời, BỎ mục câu hỏi mở rồi trình lại plan.`,
-    planDecideSelfReason:
-      'Người dùng để bạn TỰ QUYẾT các câu hỏi mở của plan. Hãy chọn phương án hợp lý nhất, ghi rõ giả định vào plan, BỎ mục câu hỏi mở rồi trình lại plan.',
     planMore: (n) => `… +${n} bước nữa`,
     planFooter:
       '👇 Chọn bên dưới, hoặc REPLY tin này để góp ý / yêu cầu sửa plan — chỉ tài khoản trong allowlist mới thao tác được.',
@@ -110,15 +101,6 @@ const STRINGS = {
     planNotice: (tag) =>
       `📋 ${tag} Claude Code has a plan to review — open Claude Code to read and choose (Accept / Revise / Reject).`,
     planHeader: (tag) => `📋 ${tag} Claude Code has a plan for you to review:`,
-    planQuestionsHeader: (tag) => `❓ ${tag} Claude Code has open questions in the plan — please answer before the plan is rebuilt:`,
-    planQuestionsFooter: '↩️ REPLY to this message with your answers (e.g. "1A, 2: yes" or free text), or tap a button below.',
-    btnPlanDecideSelf: '🤖 Let Claude decide',
-    planAnswered: (who, text) => `✅ Answers sent${who}: "${text}"`,
-    planDecideSelf: (who) => `🤖 Left the open questions for Claude to decide${who}.`,
-    planAnswersReason: (text) =>
-      `The user answered the plan's OPEN QUESTIONS via Telegram: "${text}". Stay in plan mode, update the plan accordingly, REMOVE the open-questions section and present the plan again.`,
-    planDecideSelfReason:
-      "The user lets YOU DECIDE the plan's open questions. Pick the most reasonable option, state the assumption in the plan, REMOVE the open-questions section and present the plan again.",
     planMore: (n) => `… +${n} more steps`,
     planFooter:
       '👇 Choose below, or REPLY to this message with feedback / requested changes — only allowlisted accounts can act.',
