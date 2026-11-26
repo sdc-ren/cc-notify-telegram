@@ -15,15 +15,15 @@
 
 import { realpathSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { hasCredentials, loadConfig, normalizeProviderId, PROVIDERS } from './lib/config.mjs';
-import { projectName, strings } from './lib/strings.mjs';
+import { hasCredentials, loadConfig } from './lib/config.mjs';
+import { strings } from './lib/strings.mjs';
 import { makeTelegram } from './lib/telegram.mjs';
 import { runStop } from './lib/stop.mjs';
 import { runAsk, runAskDone } from './lib/ask.mjs';
 import { runPerm } from './lib/perm.mjs';
 import { runNotify } from './lib/notify.mjs';
 
-// Giữ API cũ: test, CLI và bridge import mọi thứ từ file này.
+// Giữ API cũ: test và CLI import mọi thứ từ file này.
 export * from './lib/config.mjs';
 export * from './lib/strings.mjs';
 export * from './lib/telegram.mjs';
@@ -45,57 +45,12 @@ async function readStdin() {
   return data;
 }
 
-function parseRuntimeArgs(args, env = process.env) {
-  if (PROVIDERS.includes(args[0])) {
-    return { providerId: args[0], event: args[1] || 'stop' };
-  }
-  return {
-    event: args[0] || 'stop',
-    providerId: normalizeProviderId(args[1] || env.AI_NOTIFY_PROVIDER || env.CC_NOTIFY_PROVIDER || 'claude'),
-  };
-}
-
-function normalizeRuntimePayload(raw, providerId, event, env = process.env) {
-  const provider = normalizeProviderId(raw.provider || raw.providerId || providerId);
-  const toolCall = raw.toolCall || {};
-  const toolArgs = toolCall.args || raw.tool_input || raw.toolInput || {};
-  const questions = Array.isArray(toolArgs.questions)
-    ? toolArgs.questions.map((q) => ({
-        ...q,
-        multiSelect: q.multiSelect ?? q.is_multi_select,
-      }))
-    : raw.questions;
-  const command = raw.command || raw.item?.command || raw.commandActions?.[0]?.command;
-  const sessionId = raw.session_id || raw.sessionId || raw.conversationId || raw.threadId || raw.turnId || '';
-  return {
-    ...raw,
-    provider,
-    session_id: sessionId,
-    turn_id: raw.turn_id || raw.turnId || raw['turn-id'],
-    transcript_path: raw.transcript_path || raw.transcriptPath,
-    cwd: raw.cwd || raw.cwdPath || raw.workspacePaths?.[0] || process.cwd(),
-    tool_name: raw.tool_name || raw.toolName || toolCall.name || (command ? 'Command' : undefined),
-    tool_input: {
-      ...(command ? { command, cwd: raw.cwd, reason: raw.reason } : {}),
-      ...toolArgs,
-      ...(questions ? { questions } : {}),
-    },
-    tool_response: raw.tool_response || raw.toolResponse,
-    message: raw.message || raw.reason || raw.notification?.message,
-    notification_type: raw.notification_type || raw.notificationType,
-    type: raw.type,
-    input_messages: raw.input_messages || raw.inputMessages || raw['input-messages'],
-    last_assistant_message: raw.last_assistant_message || raw.lastAssistantMessage || raw['last-assistant-message'],
-    _normalizedProvider: provider,
-    _normalizedEvent: event,
-    _project: projectName(raw, env),
-  };
-}
-
 async function main() {
+  // Lệnh hook: `node cc-notify-telegram.mjs <event>`; arg thừa phía sau (vd `claude` do bản
+  // multi-provider cũ ghi vào settings.json) bị bỏ qua.
   const args = process.argv.slice(2);
-  const parsed = parseRuntimeArgs(args);
-  let cfg = loadConfig({ providerId: parsed.providerId });
+  const event = args[0] || 'stop';
+  const cfg = loadConfig();
 
   if (args.includes('--test')) {
     if (hasCredentials(cfg)) await makeTelegram(cfg).sendMessage(strings(cfg).testMessage);
@@ -104,24 +59,18 @@ async function main() {
   if (!hasCredentials(cfg)) return null;
 
   let payload = {};
-  const stdin = await readStdin();
-  const argvPayload = args.find((arg, index) => index > 1 && String(arg).trim().startsWith('{'));
   try {
-    payload = JSON.parse(stdin || argvPayload || '{}');
+    payload = JSON.parse((await readStdin()) || '{}');
   } catch {
     return null;
   }
-  const providerId = normalizeProviderId(payload.provider || payload.providerId || parsed.providerId);
-  cfg = loadConfig({ providerId });
-  cfg.providerId = providerId;
-  payload = normalizeRuntimePayload(payload, providerId, parsed.event, process.env);
   const tg = makeTelegram(cfg);
 
-  if (parsed.event === 'stop') return runStop(payload, cfg, tg, process.env).then(() => null);
-  if (parsed.event === 'ask') return runAsk(payload, cfg, tg, process.env);
-  if (parsed.event === 'ask-done') return runAskDone(payload, cfg, tg).then(() => null);
-  if (parsed.event === 'notify') return runNotify(payload, cfg, tg, process.env).then(() => null);
-  if (parsed.event === 'perm') return runPerm(payload, cfg, tg, process.env);
+  if (event === 'stop') return runStop(payload, cfg, tg, process.env).then(() => null);
+  if (event === 'ask') return runAsk(payload, cfg, tg, process.env);
+  if (event === 'ask-done') return runAskDone(payload, cfg, tg).then(() => null);
+  if (event === 'notify') return runNotify(payload, cfg, tg, process.env).then(() => null);
+  if (event === 'perm') return runPerm(payload, cfg, tg, process.env);
   return null;
 }
 

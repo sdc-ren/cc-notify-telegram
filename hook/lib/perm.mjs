@@ -2,7 +2,6 @@
 
 import { unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { normalizeProviderId, providerDisplayName } from './config.mjs';
 import { buildTag, projectName, strings } from './strings.mjs';
 import { ensureStateDirs, gcStateDir, pendingKey, pendingPath, readSessionAllow, writeSessionAllow } from './state.mjs';
 import { waitForReply } from './poller.mjs';
@@ -21,18 +20,6 @@ export function permOutput(behavior, { message, updatedInput, updatedPermissions
   return JSON.stringify({ hookSpecificOutput: { hookEventName: 'PermissionRequest', decision } });
 }
 
-export function formatPermissionOutput(providerId, behavior, { message, session = false } = {}) {
-  const provider = normalizeProviderId(providerId);
-  if (provider === 'antigravity') {
-    if (behavior === 'allow') return JSON.stringify({ decision: 'allow' });
-    return JSON.stringify({ decision: 'deny', ...(message ? { reason: message } : {}) });
-  }
-  if (provider === 'codex') {
-    return permOutput(behavior, { message });
-  }
-  return permOutput(behavior, { message });
-}
-
 export const capText = (value, max) => {
   const cps = Array.from(String(value));
   return cps.length > max ? cps.slice(0, max).join('') + '…' : cps.join('');
@@ -45,25 +32,13 @@ export function describePermission(toolName, toolInput) {
   const fenced = (value, max = 1500) => ['```', capText(value, max), '```'];
   const out = [];
 
-  if (toolName === 'Bash' || toolName === 'PowerShell' || toolName === 'Command') {
+  if (toolName === 'Bash' || toolName === 'PowerShell') {
     if (t.description) out.push(String(t.description));
-    if (t.reason) out.push(String(t.reason));
-    if (t.cwd) out.push(`cwd: ${t.cwd}`);
     if (t.command) out.push(...fenced(t.command, 3000));
-    if (t.networkApprovalContext) out.push(...fenced(JSON.stringify(t.networkApprovalContext, null, 2), 800));
-    if (t.additionalPermissions) out.push(...fenced(JSON.stringify(t.additionalPermissions, null, 2), 1200));
   } else if (toolName === 'Edit' || toolName === 'Write' || toolName === 'NotebookEdit') {
     if (t.file_path) out.push(String(t.file_path));
     const body = t.new_string ?? t.content ?? t.new_source;
     if (body != null) out.push(...fenced(body));
-  } else if (toolName === 'FileChange') {
-    if (t.reason) out.push(String(t.reason));
-    if (t.grantRoot) out.push(`grantRoot: ${t.grantRoot}`);
-    if (t.fileChanges) out.push(...fenced(JSON.stringify(t.fileChanges, null, 2), 2000));
-  } else if (toolName === 'Permissions') {
-    if (t.reason) out.push(String(t.reason));
-    if (t.cwd) out.push(`cwd: ${t.cwd}`);
-    if (t.permissions) out.push(...fenced(JSON.stringify(t.permissions, null, 2), 1600));
   } else if (toolName === 'WebFetch') {
     if (t.url) out.push(String(t.url));
     if (t.prompt) out.push(capText(t.prompt, 400));
@@ -79,10 +54,10 @@ export function describePermission(toolName, toolInput) {
   return out.filter((line) => line !== '' && line != null).join('\n');
 }
 
-export function buildPermMessage({ toolName, toolInput, project, suffix, str, providerId }) {
-  const tag = buildTag({ providerId, project, suffix });
+export function buildPermMessage({ toolName, toolInput, project, suffix, str }) {
+  const tag = buildTag({ project, suffix });
   const detail = describePermission(toolName, toolInput);
-  return [str.permHeader(tag, providerId ? providerDisplayName(providerId) : undefined), '', `🔧 ${toolName}`, detail || str.permNoDetail, '', str.permFooter].join('\n');
+  return [str.permHeader(tag), '', `🔧 ${toolName}`, detail || str.permNoDetail, '', str.permFooter].join('\n');
 }
 
 // --- Plan (ExitPlanMode): duyệt / góp ý qua Telegram ---
@@ -154,15 +129,7 @@ export async function promptTelegramPermission({
   const str = strings(cfg);
   const key = pendingKey(sessionId, [{ question: `${toolName}:${JSON.stringify(toolInput ?? null)}` }]);
   const chunks = chunkMessage(
-    text ??
-      buildPermMessage({
-        toolName,
-        toolInput,
-        project,
-        suffix,
-        str,
-        providerId: cfg.providerId,
-      })
+    text ?? buildPermMessage({ toolName, toolInput, project, suffix, str })
   );
 
   // Bàn phím nút gắn vào tin CUỐI. Gửi thiếu dù chỉ 1 chunk là nhả về máy: duyệt khi mới
@@ -174,9 +141,7 @@ export async function promptTelegramPermission({
     try {
       const sent = await tg.sendMessage(
         chunks[i],
-        isAnchor
-          ? { reply_markup: keyboard || permKeyboard(key, str, cfg.sessionAllowTtlMin), providerId: cfg.providerId }
-          : { providerId: cfg.providerId }
+        isAnchor ? { reply_markup: keyboard || permKeyboard(key, str, cfg.sessionAllowTtlMin) } : {}
       );
       if (!sent?.message_id) throw new Error('no message_id');
       messageIds.push(sent.message_id);
@@ -267,7 +232,7 @@ export async function runPerm(payload, cfg, tg, env, home = homedir()) {
     project: projectName(payload, env),
     suffix: String(payload.session_id || '').slice(-4),
   });
-  if (prompt.type === 'session-allow') return formatPermissionOutput(cfg.providerId, 'allow');
+  if (prompt.type === 'session-allow') return permOutput('allow');
   if (prompt.type !== 'ok') return null;
   const { outcome, anchorId, dir } = prompt;
 
@@ -275,7 +240,7 @@ export async function runPerm(payload, cfg, tg, env, home = homedir()) {
     const who = outcome.fromName ? ` (${outcome.fromName})` : '';
     if (outcome.action === 'd') {
       await tg.editMessageText(anchorId, str.permDenied(who)).catch(() => {});
-      return formatPermissionOutput(cfg.providerId, 'deny', { message: str.permDenyReason });
+      return permOutput('deny', { message: str.permDenyReason });
     }
     if (outcome.action === 's') {
       const until = writeSessionAllow(dir, payload.session_id, cfg.sessionAllowTtlMin);
@@ -283,7 +248,7 @@ export async function runPerm(payload, cfg, tg, env, home = homedir()) {
     } else {
       await tg.editMessageText(anchorId, str.permAllowed(who)).catch(() => {});
     }
-    return formatPermissionOutput(cfg.providerId, 'allow', { session: outcome.action === 's' });
+    return permOutput('allow');
   }
 
   // 'l' (để máy xử lý) / remote-off / timeout → im lặng ⇒ hộp thoại hiện tại máy.

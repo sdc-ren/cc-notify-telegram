@@ -1,6 +1,5 @@
 // Duyệt plan (ExitPlanMode): rút gọn plan, câu hỏi mở, nút duyệt.
 
-import { providerDisplayName } from './config.mjs';
 import { buildTag, projectName } from './strings.mjs';
 import { pendingKey } from './state.mjs';
 import { isLocalKeyword } from './poller.mjs';
@@ -154,9 +153,8 @@ export function condensePlan(plan, { maxSteps = 30, maxStepChars = 120 } = {}) {
   return { title: cleanPlanStep(title, 90), steps: all.slice(0, maxSteps), total: all.length };
 }
 
-export function buildPlanMessage({ plan, project, suffix, str, providerId, detail = 'summary' }) {
-  const tag = buildTag({ providerId, project, suffix });
-  const header = str.planHeader(tag, providerId ? providerDisplayName(providerId) : undefined);
+export function buildPlanMessage({ plan, project, suffix, str, detail = 'summary' }) {
+  const header = str.planHeader(buildTag({ project, suffix }));
   if (detail === 'full') return [header, '', plan, '', str.planFooter].join('\n');
 
   const { title, steps, total } = condensePlan(plan);
@@ -172,9 +170,8 @@ export function buildPlanMessage({ plan, project, suffix, str, providerId, detai
 }
 
 // Plan còn câu hỏi mở: gửi ĐẦY ĐỦ câu hỏi, xin trả lời trước khi dựng lại plan.
-export function buildPlanQuestionsMessage({ questions, project, suffix, str, providerId }) {
-  const tag = buildTag({ providerId, project, suffix });
-  return [str.planQuestionsHeader(tag, providerId ? providerDisplayName(providerId) : undefined), '', questions, '', str.planQuestionsFooter].join('\n');
+export function buildPlanQuestionsMessage({ questions, project, suffix, str }) {
+  return [str.planQuestionsHeader(buildTag({ project, suffix })), '', questions, '', str.planQuestionsFooter].join('\n');
 }
 
 export function planQuestionsKeyboard(key, str) {
@@ -210,9 +207,8 @@ export function planApproveOutput(toolInput, mode) {
 }
 
 // Tin báo gọn khi có plan nhưng KHÔNG đọc được nội dung (không nút, nhả về máy để duyệt).
-export function buildPlanNotice({ project, suffix, str, providerId }) {
-  const tag = buildTag({ providerId, project, suffix });
-  return str.planNotice(tag, providerId ? providerDisplayName(providerId) : undefined);
+export function buildPlanNotice({ project, suffix, str }) {
+  return str.planNotice(buildTag({ project, suffix }));
 }
 
 async function runPlanQuestions({ payload, cfg, tg, env, home, str, project, suffix, plan, questions }) {
@@ -228,7 +224,7 @@ async function runPlanQuestions({ payload, cfg, tg, env, home, str, project, suf
     project,
     suffix,
     kind: 'plan',
-    text: buildPlanQuestionsMessage({ questions, project, suffix, str, providerId: cfg.providerId }),
+    text: buildPlanQuestionsMessage({ questions, project, suffix, str }),
     keyboard: planQuestionsKeyboard(key, str),
   });
   if (prompt.type !== 'ok') return null;
@@ -256,9 +252,7 @@ export async function runPlan(payload, cfg, tg, env, home, str) {
   const plan = planTextOf(payload.tool_input);
 
   if (!plan) {
-    await tg
-      .sendMessage(buildPlanNotice({ project, suffix, str, providerId: cfg.providerId }), { providerId: cfg.providerId })
-      .catch(() => {});
+    await tg.sendMessage(buildPlanNotice({ project, suffix, str })).catch(() => {});
     return null;
   }
 
@@ -280,7 +274,7 @@ export async function runPlan(payload, cfg, tg, env, home, str) {
     project,
     suffix,
     kind: 'plan',
-    text: buildPlanMessage({ plan, project, suffix, str, providerId: cfg.providerId, detail: cfg.planDetail }),
+    text: buildPlanMessage({ plan, project, suffix, str, detail: cfg.planDetail }),
     keyboard: planKeyboard(key, str),
   });
   if (prompt.type !== 'ok') return null;

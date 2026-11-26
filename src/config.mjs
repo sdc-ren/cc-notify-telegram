@@ -1,12 +1,12 @@
-// Đọc/ghi config multi-provider (chứa bot token → chmod 600 trên Unix).
-// Đường dẫn mới: ~/.config/ai-notify-telegram/config.json
-// Đường dẫn cũ vẫn được đọc để không làm hỏng máy đã cài Claude trước đó.
+// Đọc/ghi config (chứa bot token → chmod 600 trên Unix).
+// Đường dẫn: ~/.config/ai-notify-telegram/config.json (giữ tên cũ để không làm hỏng máy đã cài).
+// Đường dẫn cũ ~/.claude/cc-notify-telegram.json vẫn được đọc.
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-export const PROVIDERS = ['claude', 'codex', 'antigravity'];
+import { configThreadId, isSwitchOn } from '../hook/lib/config.mjs';
 
 export function configPath(home = homedir()) {
   return join(home, '.config', 'ai-notify-telegram', 'config.json');
@@ -16,68 +16,30 @@ export function legacyConfigPath(home = homedir()) {
   return join(home, '.claude', 'cc-notify-telegram.json');
 }
 
-function boolOrDefault(value, fallback = false) {
-  return typeof value === 'boolean' ? value : fallback;
-}
-
-export function normalizeProviderMap(value, fallback = false) {
-  const input = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  return Object.fromEntries(PROVIDERS.map((id) => [id, boolOrDefault(input[id], fallback)]));
-}
-
-export function normalizeToggle(value, fallback = false, { legacy = false } = {}) {
-  if (typeof value === 'boolean') {
-    if (legacy) return { global: value, providers: { claude: value, codex: false, antigravity: false } };
-    return { global: value, providers: normalizeProviderMap(null, value) };
-  }
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const global = boolOrDefault(value.global, fallback);
-    return { global, providers: normalizeProviderMap(value.providers, global) };
-  }
-  return { global: fallback, providers: normalizeProviderMap(null, fallback) };
-}
-
-export function isToggleEnabled(cfg, key, provider = 'claude') {
-  const toggle = normalizeToggle(cfg?.[key], false);
-  if (!toggle.global) return false;
-  return toggle.providers[provider] === true;
-}
-
-export function normalizeConfig(cfg = {}, { legacy = false } = {}) {
-  const enabledProviders = Array.isArray(cfg.enabledProviders)
-    ? cfg.enabledProviders.filter((id) => PROVIDERS.includes(id))
-    : ['claude'];
-  const uniqueEnabled = [...new Set(enabledProviders.length ? enabledProviders : ['claude'])];
+// Đưa config về dạng hiện tại: `remote` / `remotePermission` là boolean, topic nằm ở `threadId`.
+// Config do bản multi-provider cũ ghi (object { global, providers }, providerThreads,
+// enabledProviders) được chuyển đổi tại đây và bỏ các key không còn dùng.
+export function normalizeConfig(cfg = {}) {
+  const { providerThreads, enabledProviders, ...rest } = cfg;
+  const threadId = configThreadId(cfg);
+  delete rest.threadId;
   return {
-    ...cfg,
-    providerThreads: cfg.providerThreads && typeof cfg.providerThreads === 'object' ? cfg.providerThreads : {},
-    enabledProviders: uniqueEnabled,
-    remote: normalizeToggle(cfg.remote, false, { legacy }),
-    remotePermission: normalizeToggle(cfg.remotePermission, false, { legacy }),
+    ...rest,
+    ...(threadId != null && threadId !== '' ? { threadId } : {}),
+    remote: isSwitchOn(cfg.remote),
+    remotePermission: isSwitchOn(cfg.remotePermission),
   };
 }
 
 export function readConfig(home = homedir()) {
-  const files = [
-    { file: configPath(home), legacy: false },
-    { file: legacyConfigPath(home), legacy: true },
-  ];
-  for (const item of files) {
+  for (const file of [configPath(home), legacyConfigPath(home)]) {
     try {
-      return normalizeConfig(JSON.parse(readFileSync(item.file, 'utf8')), { legacy: item.legacy });
+      return normalizeConfig(JSON.parse(readFileSync(file, 'utf8')));
     } catch {
       // thử đường dẫn tiếp theo
     }
   }
   return null;
-}
-
-export function readRawConfig(home = homedir()) {
-  try {
-    return JSON.parse(readFileSync(configPath(home), 'utf8'));
-  } catch {
-    return null;
-  }
 }
 
 export function writeConfig(cfg, home = homedir()) {

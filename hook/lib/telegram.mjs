@@ -93,8 +93,7 @@ export function makeTelegram(cfg, fetchFn = fetch) {
   }
   return {
     sendMessage: async (text, extra = {}) => {
-      const provider = extra.providerId ?? cfg.providerId;
-      const threadId = extra.message_thread_id ?? cfg.providerThreads?.[provider] ?? cfg.threadId;
+      const threadId = extra.message_thread_id ?? cfg.threadId;
       const params = {
         chat_id: cfg.chatId,
         text,
@@ -102,7 +101,6 @@ export function makeTelegram(cfg, fetchFn = fetch) {
         ...(threadId != null && threadId !== '' ? { message_thread_id: Number(threadId) } : {}),
         ...extra,
       };
-      delete params.providerId;
       try {
         return await call('sendMessage', params);
       } catch (err) {

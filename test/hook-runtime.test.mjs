@@ -61,6 +61,33 @@ test('shim đã cài nạp được runtime và exit 0 khi chưa có config', ()
   }
 });
 
+test('shim chịu được arg provider thừa (`stop claude`) của bản cài cũ', () => {
+  const home = tempHome();
+  try {
+    const hookFile = join(home, '.claude', 'hooks', 'cc-notify-telegram.mjs');
+    installHookRuntime(hookFile);
+    mkdirSync(join(home, '.config', 'ai-notify-telegram'), { recursive: true });
+    writeFileSync(
+      join(home, '.config', 'ai-notify-telegram', 'config.json'),
+      JSON.stringify({ botToken: 'T', chatId: '-1', remote: false })
+    );
+    const env = { ...process.env, HOME: home, USERPROFILE: home };
+    for (const key of ['TELEGRAM_BOT_TOKEN', 'TELEGRAM_CHAT_ID', 'CC_NOTIFY_REMOTE']) delete env[key];
+    for (const event of ['stop', 'ask', 'perm']) {
+      const res = spawnSync(process.execPath, [hookFile, event, 'claude'], {
+        input: JSON.stringify({ session_id: 's1', cwd: home, last_assistant_message: 'no marker' }),
+        env,
+        encoding: 'utf8',
+      });
+      assert.equal(res.status, 0, res.stderr);
+      assert.equal(res.stdout, '');
+      assert.equal(res.stderr, '');
+    }
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
 test('removeHookRuntime: xoá shim lẫn thư mục runtime', () => {
   const home = tempHome();
   try {

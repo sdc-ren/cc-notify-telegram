@@ -83,7 +83,7 @@ export async function waitForReply({ tg, cfg, dir, ownMessageIds, deadline, env,
     while (Date.now() < deadline) {
       // Tắt cờ giữa chừng (user về máy) → nhả về UI local trong vài giây.
       // Đọc lại config MỖI vòng nên `remote off` / `remote-perm off` có hiệu lực ngay.
-      const live = loadConfig({ env, home, providerId: cfg.providerId });
+      const live = loadConfig({ env, home });
       if (!live.remote || (mode === 'perm' && !live.remotePermission)) return { type: 'remote-off' };
 
       // 1) inbox của mình có sẵn kết quả (poller khác phân phát)? — vào bất kỳ chunk nào
@@ -166,7 +166,7 @@ export async function waitForReply({ tg, cfg, dir, ownMessageIds, deadline, env,
         } else if (verdict.kind === 'need-reply-hint' && Date.now() - lastHintAt > 60_000) {
           lastHintAt = Date.now();
           const askCount = pending.filter((p) => p.kind !== 'perm').length;
-          await tg.sendMessage(strings(cfg).replyHint(askCount), { providerId: cfg.providerId }).catch(() => {});
+          await tg.sendMessage(strings(cfg).replyHint(askCount)).catch(() => {});
         }
       }
     }

@@ -1,15 +1,14 @@
-// Chuỗi tin nhắn (vi/en) và tag [Agent · Project · Session].
+// Chuỗi tin nhắn (vi/en) và tag [Project · Session].
 
 import { basename } from 'node:path';
-import { providerDisplayName } from './config.mjs';
 
 const STRINGS = {
   vi: {
     doneFallback: '— đã hoàn thành công việc',
     donePlain: 'đã hoàn thành công việc',
     escalateFallback: '🛑 Cần bạn xử lý',
-    escalateSuffix: (project, provider = 'Claude Code') => `— ${project}: mở ${provider} xem chi tiết`,
-    askHeader: (tag, provider = 'Claude') => `❓ ${tag} ${provider} đang hỏi:`,
+    escalateSuffix: (project) => `— ${project}: mở Claude Code xem chi tiết`,
+    askHeader: (tag) => `❓ ${tag} Claude đang hỏi:`,
     askFooter:
       '↩️ Reply tin này để trả lời (vd: "1A" / "1A, 2B" / mô tả tự do).\nReply "local" nếu muốn trả lời tại máy.',
     askMulti: '(chọn được nhiều)',
@@ -23,7 +22,7 @@ const STRINGS = {
     answerPrefix: (text) => `Người dùng trả lời qua Telegram: "${text}"`,
     answerResolved: (parts) => `(Diễn giải lựa chọn: ${parts.join('; ')})`,
     notifyPrefix: '🔔',
-    permHeader: (tag, provider = 'Claude') => `🔐 ${tag} ${provider} xin quyền dùng:`,
+    permHeader: (tag) => `🔐 ${tag} Claude xin quyền dùng:`,
     permFooter: '👇 Chọn bên dưới — chỉ tài khoản trong allowlist mới bấm được.',
     permNoDetail: '(không có chi tiết)',
     btnAllow: '✅ Cho phép',
@@ -43,10 +42,10 @@ const STRINGS = {
     planClosedLocal: '🖥 Plan đã được xử lý tại máy hoặc đã hủy.',
     staleButton: 'Yêu cầu này đã đóng (xử lý tại máy hoặc đã hủy) — nút không còn tác dụng.',
     permNoRight: 'Bạn không có quyền duyệt yêu cầu này.',
-    planNotice: (tag, provider = 'Claude Code') =>
-      `📋 ${tag} ${provider} có plan cần bạn duyệt — mở ${provider} để đọc và chọn (Accept / Revise / Reject).`,
-    planHeader: (tag, provider = 'Claude Code') => `📋 ${tag} ${provider} có plan cần bạn duyệt:`,
-    planQuestionsHeader: (tag, provider = 'Claude Code') => `❓ ${tag} ${provider} có câu hỏi mở trong plan — cần bạn trả lời trước khi dựng lại plan:`,
+    planNotice: (tag) =>
+      `📋 ${tag} Claude Code có plan cần bạn duyệt — mở Claude Code để đọc và chọn (Accept / Revise / Reject).`,
+    planHeader: (tag) => `📋 ${tag} Claude Code có plan cần bạn duyệt:`,
+    planQuestionsHeader: (tag) => `❓ ${tag} Claude Code có câu hỏi mở trong plan — cần bạn trả lời trước khi dựng lại plan:`,
     planQuestionsFooter: '↩️ REPLY tin này để trả lời (vd "1A, 2: có" hoặc mô tả tự do), hoặc bấm nút bên dưới.',
     btnPlanDecideSelf: '🤖 Claude tự quyết',
     planAnswered: (who, text) => `✅ Đã gửi câu trả lời${who}: "${text}"`,
@@ -74,8 +73,8 @@ const STRINGS = {
     doneFallback: '— task completed',
     donePlain: 'task completed',
     escalateFallback: '🛑 Needs your attention',
-    escalateSuffix: (project, provider = 'Claude Code') => `— ${project}: open ${provider} for details`,
-    askHeader: (tag, provider = 'Claude') => `❓ ${tag} ${provider} is asking:`,
+    escalateSuffix: (project) => `— ${project}: open Claude Code for details`,
+    askHeader: (tag) => `❓ ${tag} Claude is asking:`,
     askFooter:
       '↩️ Reply to this message to answer (e.g. "1A" / "1A, 2B" / free text).\nReply "local" to answer at the machine.',
     askMulti: '(multiple choices allowed)',
@@ -89,7 +88,7 @@ const STRINGS = {
     answerPrefix: (text) => `User answered via Telegram: "${text}"`,
     answerResolved: (parts) => `(Interpreted choices: ${parts.join('; ')})`,
     notifyPrefix: '🔔',
-    permHeader: (tag, provider = 'Claude') => `🔐 ${tag} ${provider} is requesting permission to use:`,
+    permHeader: (tag) => `🔐 ${tag} Claude is requesting permission to use:`,
     permFooter: '👇 Choose below — only allowlisted accounts can act.',
     permNoDetail: '(no details)',
     btnAllow: '✅ Allow',
@@ -108,10 +107,10 @@ const STRINGS = {
     planClosedLocal: '🖥 Plan was handled at the machine or cancelled.',
     staleButton: 'This request is closed (handled at the machine or cancelled) — the button no longer does anything.',
     permNoRight: 'You are not allowed to approve this request.',
-    planNotice: (tag, provider = 'Claude Code') =>
-      `📋 ${tag} ${provider} has a plan to review — open ${provider} to read and choose (Accept / Revise / Reject).`,
-    planHeader: (tag, provider = 'Claude Code') => `📋 ${tag} ${provider} has a plan for you to review:`,
-    planQuestionsHeader: (tag, provider = 'Claude Code') => `❓ ${tag} ${provider} has open questions in the plan — please answer before the plan is rebuilt:`,
+    planNotice: (tag) =>
+      `📋 ${tag} Claude Code has a plan to review — open Claude Code to read and choose (Accept / Revise / Reject).`,
+    planHeader: (tag) => `📋 ${tag} Claude Code has a plan for you to review:`,
+    planQuestionsHeader: (tag) => `❓ ${tag} Claude Code has open questions in the plan — please answer before the plan is rebuilt:`,
     planQuestionsFooter: '↩️ REPLY to this message with your answers (e.g. "1A, 2: yes" or free text), or tap a button below.',
     btnPlanDecideSelf: '🤖 Let Claude decide',
     planAnswered: (who, text) => `✅ Answers sent${who}: "${text}"`,
@@ -142,13 +141,12 @@ export function strings(cfg) {
 }
 
 export function projectName(payload, env = process.env) {
-  const workspace = Array.isArray(payload.workspacePaths) ? payload.workspacePaths[0] : '';
-  return basename(env.CLAUDE_PROJECT_DIR || payload.cwd || payload.cwdPath || workspace || '') || 'project';
+  return basename(env.CLAUDE_PROJECT_DIR || payload.cwd || '') || 'project';
 }
 
-export function buildTag({ providerId, project = 'project', suffix = '', sessionId = '' }) {
+export function buildTag({ project = 'project', suffix = '', sessionId = '' }) {
   const tail = suffix || (sessionId ? String(sessionId).slice(-4) : '');
-  const parts = providerId ? [providerDisplayName(providerId), project] : [project];
+  const parts = [project];
   if (tail) parts.push(tail);
   return `[${parts.join(' · ')}]`;
 }

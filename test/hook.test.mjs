@@ -565,8 +565,8 @@ test('planTextOf: lấy tool_input.plan, rỗng / sai kiểu → chuỗi rỗng'
 });
 
 test('buildPlanMessage detail=full: có tag, NGUYÊN VĂN plan và hướng dẫn reply', () => {
-  const msg = buildPlanMessage({ plan: '# Plan\n- step 1', project: 'proj', suffix: 'a1b2', str, providerId: 'claude', detail: 'full' });
-  assert.match(msg, /^📋 \[Claude · proj · a1b2\]/);
+  const msg = buildPlanMessage({ plan: '# Plan\n- step 1', project: 'proj', suffix: 'a1b2', str, detail: 'full' });
+  assert.match(msg, /^📋 \[proj · a1b2\] Claude Code có plan/);
   assert.match(msg, /# Plan\n- step 1/);
   assert.match(msg, /REPLY/);
 });
@@ -621,8 +621,8 @@ test('condensePlan: heading kiểu "### Bước 1: …" và plan không có cấ
 });
 
 test('buildPlanMessage (mặc định summary): ngắn hơn bản đầy đủ, không còn đường dẫn/bối cảnh, KHÔNG bắt về máy xem', () => {
-  const summary = buildPlanMessage({ plan: LONG_PLAN, project: 'shop', suffix: 'ab12', str, providerId: 'claude' });
-  const full = buildPlanMessage({ plan: LONG_PLAN, project: 'shop', suffix: 'ab12', str, providerId: 'claude', detail: 'full' });
+  const summary = buildPlanMessage({ plan: LONG_PLAN, project: 'shop', suffix: 'ab12', str });
+  const full = buildPlanMessage({ plan: LONG_PLAN, project: 'shop', suffix: 'ab12', str, detail: 'full' });
   assert.ok(summary.length < full.length / 2);
   assert.match(summary, /📌 Thêm báo cáo doanh thu/);
   assert.match(summary, /1\. Tạo bảng daily_sales/);
@@ -631,10 +631,10 @@ test('buildPlanMessage (mặc định summary): ngắn hơn bản đầy đủ, 
 });
 
 test('buildPlanMessage summary: plan không có cấu trúc → fallback đoạn đầu đã làm sạch; quá 30 bước → "+N"', () => {
-  const free = buildPlanMessage({ plan: 'Sửa **file** src/a/b/c.ts và thêm test.', project: 'p', suffix: '', str, providerId: 'claude' });
+  const free = buildPlanMessage({ plan: 'Sửa **file** src/a/b/c.ts và thêm test.', project: 'p', suffix: '', str });
   assert.match(free, /Sửa và thêm test/);
   const many = '## Steps\n' + Array.from({ length: 33 }, (_, i) => `- Việc số ${i + 1}`).join('\n');
-  assert.match(buildPlanMessage({ plan: many, project: 'p', suffix: '', str, providerId: 'claude' }), /… \+3 bước nữa/);
+  assert.match(buildPlanMessage({ plan: many, project: 'p', suffix: '', str }), /… \+3 bước nữa/);
 });
 
 test('loadConfig: planDetail mặc định summary, "full" qua file hoặc env', () => {
@@ -712,7 +712,7 @@ function planHarness({ updates, plan = '# Plan\n- bước 1' }) {
     remoteAskTimeoutSec: 5,
   };
   writeFileSync(join(home, '.config', 'ai-notify-telegram', 'config.json'), JSON.stringify(cfgFile));
-  const cfg = loadConfig({ env: {}, home, providerId: 'claude' });
+  const cfg = loadConfig({ env: {}, home });
   const sent = [];
   const edits = [];
   const queue = [...updates];
@@ -803,7 +803,7 @@ test('runPlan: không đọc được nội dung plan → chỉ báo, KHÔNG nú
   const h = planHarness({ updates: [], plan: '' });
   assert.equal(await h.run(), null);
   assert.equal(h.sent.length, 1);
-  assert.equal(h.sent[0].opts.reply_markup, undefined);
+  assert.equal(h.sent[0].opts?.reply_markup, undefined);
   assert.match(h.sent[0].text, /có plan cần bạn duyệt/);
 });
 
@@ -912,8 +912,8 @@ test('condensePlan: liệt kê HẾT các bước (không cắt ở 8)', () => {
 });
 
 test('buildPlanQuestionsMessage: có tag, đủ câu hỏi, hướng dẫn reply', () => {
-  const msg = buildPlanQuestionsMessage({ questions: extractOpenQuestions(PLAN_WITH_QUESTIONS), project: 'shop', suffix: 'ab12', str, providerId: 'claude' });
-  assert.match(msg, /^❓ \[Claude · shop · ab12\]/);
+  const msg = buildPlanQuestionsMessage({ questions: extractOpenQuestions(PLAN_WITH_QUESTIONS), project: 'shop', suffix: 'ab12', str });
+  assert.match(msg, /^❓ \[shop · ab12\] Claude Code có câu hỏi mở/);
   assert.match(msg, /- B: giờ cửa hàng/);
   assert.match(msg, /REPLY/);
 });
