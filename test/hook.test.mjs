@@ -545,8 +545,10 @@ test('shouldSkipNotification: bỏ permission_prompt khi remote-perm ON, nhưng 
   assert.equal(shouldSkipNotification('permission_prompt', 'Plan ready for review', on), false);
   // remote-perm OFF → giữ nguyên hành vi cũ, không bỏ gì
   assert.equal(shouldSkipNotification('permission_prompt', 'needs permission', off), false);
-  // type khác permission_prompt (idle/agent chờ input) → luôn giữ
-  assert.equal(shouldSkipNotification('idle_prompt', 'waiting for input', on), false);
+  // idle_prompt ("Claude đang chờ input") → luôn bỏ, bật hay tắt remote-perm
+  assert.equal(shouldSkipNotification('idle_prompt', 'Claude is waiting for your input', on), true);
+  assert.equal(shouldSkipNotification('idle_prompt', 'Claude is waiting for your input', off), true);
+  // type khác → giữ
   assert.equal(shouldSkipNotification('agent_needs_input', 'Plan ready for review', on), false);
 });
 
