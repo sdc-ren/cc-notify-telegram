@@ -812,21 +812,21 @@ test('runPlan: không đọc được nội dung plan → chỉ báo, KHÔNG nú
 test('closeOnSignal: tín hiệu → chạy onClose rồi exit(0); gỡ handler thì không chạy nữa', async () => {
   let closed = 0;
   const exits = [];
-  const baseline = process.listenerCount('SIGUSR2');
-  const stop = closeOnSignal(async () => { closed++; }, { signals: ['SIGUSR2'], exit: (c) => exits.push(c) });
-  process.emit('SIGUSR2');
-  process.emit('SIGUSR2'); // bắn lần 2 không chạy lại
+  const baseline = process.listenerCount('SIGWINCH');
+  const stop = closeOnSignal(async () => { closed++; }, { signals: ['SIGWINCH'], exit: (c) => exits.push(c) });
+  process.emit('SIGWINCH');
+  process.emit('SIGWINCH'); // bắn lần 2 không chạy lại
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(closed, 1);
   assert.deepEqual(exits, [0]);
   stop();
-  assert.equal(process.listenerCount('SIGUSR2'), baseline);
+  assert.equal(process.listenerCount('SIGWINCH'), baseline);
 });
 
 test('closeOnSignal: onClose lỗi vẫn exit(0)', async () => {
   const exits = [];
-  const stop = closeOnSignal(async () => { throw new Error('mạng lỗi'); }, { signals: ['SIGUSR2'], exit: (c) => exits.push(c) });
-  process.emit('SIGUSR2');
+  const stop = closeOnSignal(async () => { throw new Error('mạng lỗi'); }, { signals: ['SIGWINCH'], exit: (c) => exits.push(c) });
+  process.emit('SIGWINCH');
   await new Promise((r) => setTimeout(r, 20));
   assert.deepEqual(exits, [0]);
   stop();

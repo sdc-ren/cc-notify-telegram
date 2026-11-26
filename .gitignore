@@ -4,3 +4,11 @@ node_modules/
 # KHÔNG BAO GIỜ commit token/config thật
 telegram.conf
 cc-notify-telegram.json
+
+# Node diagnostic reports
+report.*.json
+
+# Công cụ cục bộ / ghi chú làm việc
+.codegraph/
+.serena/
+plan/
