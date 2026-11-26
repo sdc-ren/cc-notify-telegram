@@ -5,13 +5,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { isSwitchOn, loadConfig } from '../hook/notify-telegram.mjs';
-import { configPath, readConfig, writeConfig } from '../src/config.mjs';
+import { configFile } from '../hook/lib/config.mjs';
+import { readConfig, writeConfig } from '../src/config.mjs';
 import { runRemote } from '../src/remote.mjs';
 import { parseArgs } from '../bin/cli.mjs';
 
 function writeRaw(home, data) {
   mkdirSync(join(home, '.config', 'ai-notify-telegram'), { recursive: true });
-  writeFileSync(configPath(home), JSON.stringify(data));
+  writeFileSync(configFile(home), JSON.stringify(data));
 }
 
 function fakeFetch(calls, { failFirst = false } = {}) {
@@ -102,7 +103,7 @@ test('readConfig/writeConfig: chuyển config cũ sang dạng boolean + threadId
   });
 
   writeConfig(readConfig(home), home);
-  assert.deepEqual(JSON.parse(readFileSync(configPath(home), 'utf8')), {
+  assert.deepEqual(JSON.parse(readFileSync(configFile(home), 'utf8')), {
     botToken: 'T',
     chatId: '-1',
     lang: 'en',
@@ -119,12 +120,12 @@ test('runRemote: on/off ghi boolean, đổi luôn config object cũ', async () =
   const logs = [];
 
   assert.equal(await runRemote('on', { home, log: (line) => logs.push(line) }), true);
-  let raw = JSON.parse(readFileSync(configPath(home), 'utf8'));
+  let raw = JSON.parse(readFileSync(configFile(home), 'utf8'));
   assert.equal(raw.remote, true);
   assert.equal(loadConfig({ env: {}, home }).remote, true);
 
   assert.equal(await runRemote('off', { home, log: () => {} }), true);
-  raw = JSON.parse(readFileSync(configPath(home), 'utf8'));
+  raw = JSON.parse(readFileSync(configFile(home), 'utf8'));
   assert.equal(raw.remote, false);
   assert.equal(loadConfig({ env: {}, home }).remote, false);
 });

@@ -42,7 +42,8 @@ export function legacyStateDir(home = homedir()) {
   return join(claudeDir(home), 'cc-notify-telegram');
 }
 
-function readConfigFile(home) {
+// Nội dung thô của file config (đường dẫn mới, rồi tới đường dẫn cũ); null nếu không đọc được.
+export function readRawConfig(home = homedir()) {
   for (const file of [configFile(home), legacyConfigFile(home)]) {
     try {
       return JSON.parse(readFileSync(file, 'utf8'));
@@ -50,7 +51,7 @@ function readConfigFile(home) {
       // thử đường dẫn tiếp theo
     }
   }
-  return {};
+  return null;
 }
 
 // Công tắc `remote` / `remotePermission`: boolean (dạng hiện tại) hoặc object
@@ -72,7 +73,7 @@ export function configThreadId(file) {
 }
 
 export function loadConfig({ env = process.env, home = homedir() } = {}) {
-  const file = readConfigFile(home);
+  const file = readRawConfig(home) ?? {};
   const timeout = Number(file.remoteAskTimeoutSec);
   const ttl = Number(file.sessionAllowTtlMin);
   const envBool = (envValue, fallback) =>

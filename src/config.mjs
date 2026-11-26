@@ -1,20 +1,11 @@
-// Đọc/ghi config (chứa bot token → chmod 600 trên Unix).
-// Đường dẫn: ~/.config/ai-notify-telegram/config.json (giữ tên cũ để không làm hỏng máy đã cài).
-// Đường dẫn cũ ~/.claude/cc-notify-telegram.json vẫn được đọc.
+// Ghi config cho CLI (chứa bot token → chmod 600 trên Unix). Đường dẫn và cách đọc dùng chung
+// với hook runtime trong hook/lib/config.mjs — chỉ một nơi định nghĩa.
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { configThreadId, isSwitchOn } from '../hook/lib/config.mjs';
-
-export function configPath(home = homedir()) {
-  return join(home, '.config', 'ai-notify-telegram', 'config.json');
-}
-
-export function legacyConfigPath(home = homedir()) {
-  return join(home, '.claude', 'cc-notify-telegram.json');
-}
+import { configDir, configFile, configThreadId, isSwitchOn, readRawConfig } from '../hook/lib/config.mjs';
 
 // Đưa config về dạng hiện tại: `remote` / `remotePermission` là boolean, topic nằm ở `threadId`.
 // Config do bản multi-provider cũ ghi (object { global, providers }, providerThreads,
@@ -32,19 +23,13 @@ export function normalizeConfig(cfg = {}) {
 }
 
 export function readConfig(home = homedir()) {
-  for (const file of [configPath(home), legacyConfigPath(home)]) {
-    try {
-      return normalizeConfig(JSON.parse(readFileSync(file, 'utf8')));
-    } catch {
-      // thử đường dẫn tiếp theo
-    }
-  }
-  return null;
+  const raw = readRawConfig(home);
+  return raw ? normalizeConfig(raw) : null;
 }
 
 export function writeConfig(cfg, home = homedir()) {
-  const file = configPath(home);
-  mkdirSync(join(home, '.config', 'ai-notify-telegram'), { recursive: true });
+  const file = configFile(home);
+  mkdirSync(configDir(home), { recursive: true });
   writeFileSync(file, JSON.stringify(normalizeConfig(cfg), null, 2) + '\n');
   if (process.platform !== 'win32') chmodSync(file, 0o600);
   return file;

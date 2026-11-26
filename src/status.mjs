@@ -4,13 +4,13 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 
 import {
+  configFile,
   hasCredentials,
   isTokenError,
   loadConfig,
   makeTelegram,
   networkErrorDetail,
 } from '../hook/notify-telegram.mjs';
-import { configPath } from './config.mjs';
 import { HOOK_ENTRIES } from './settings.mjs';
 import { hasBlock } from './snippet.mjs';
 import { installPaths } from './init.mjs';
@@ -28,7 +28,7 @@ export async function runStatus({ home = homedir(), log = console.log } = {}) {
   const add = (ok, label, fix = '') => rows.push({ ok, label, fix });
 
   // Config
-  const cfgFile = configPath(home);
+  const cfgFile = configFile(home);
   if (hasCredentials(cfg)) {
     add(true, `Config: ${cfgFile}`);
     if (process.platform !== 'win32' && existsSync(cfgFile)) {
