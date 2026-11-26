@@ -4,20 +4,17 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 
 import {
+  configFile,
   hasCredentials,
-  isRemoteEnabled,
-  isRemotePermEnabled,
   isTokenError,
   loadConfig,
   makeTelegram,
   networkErrorDetail,
 } from '../hook/notify-telegram.mjs';
-import { configPath } from './config.mjs';
 import { HOOK_ENTRIES } from './settings.mjs';
 import { hasBlock } from './snippet.mjs';
 import { installPaths } from './init.mjs';
-import { isHookRuntimeInstalled, runtimeDir } from './hook-runtime.mjs';
-import { ProviderRegistry } from './providers/index.mjs';
+import { isHookRuntimeInstalled, isHookRuntimeStale, runtimeDir } from './hook-runtime.mjs';
 
 function extractNodePath(command) {
   const m = /^"([^"]+)"/.exec(command || '');
@@ -27,12 +24,11 @@ function extractNodePath(command) {
 export async function runStatus({ home = homedir(), log = console.log } = {}) {
   const paths = installPaths(home);
   const cfg = loadConfig({ home });
-  const registry = new ProviderRegistry();
   const rows = [];
   const add = (ok, label, fix = '') => rows.push({ ok, label, fix });
 
   // Config
-  const cfgFile = configPath(home);
+  const cfgFile = configFile(home);
   if (hasCredentials(cfg)) {
     add(true, `Config: ${cfgFile}`);
     if (process.platform !== 'win32' && existsSync(cfgFile)) {
@@ -64,7 +60,16 @@ export async function runStatus({ home = homedir(), log = console.log } = {}) {
   }
 
   // Hook file
-  add(isHookRuntimeInstalled(paths.hookFile), `Hook: ${paths.hookFile} + ${runtimeDir(paths.hookFile)}`, 'chạy lại init để copy hook');
+  const hookInstalled = isHookRuntimeInstalled(paths.hookFile);
+  add(hookInstalled, `Hook: ${paths.hookFile} + ${runtimeDir(paths.hookFile)}`, 'chạy lại init để copy hook');
+  if (hookInstalled) {
+    const stale = isHookRuntimeStale(paths.hookFile);
+    add(
+      !stale,
+      stale ? 'Hook đã cài KHÁC bản CLI đang chạy' : 'Hook đã cài khớp bản CLI đang chạy',
+      'chạy lại init để cập nhật hook'
+    );
+  }
 
   // Settings entries + node path còn tồn tại
   let settings = {};
@@ -96,21 +101,8 @@ export async function runStatus({ home = homedir(), log = console.log } = {}) {
     'không có → Claude không phát marker, không có notify; chạy lại init'
   );
 
-  log('📊 Multi-Provider Status Matrix:');
-  log('─────────────────────────────────────────────────────────────');
-  for (const provider of registry.getAll()) {
-    const status = await provider.isInstalled({ home });
-    const remoteAsk = isRemoteEnabled(cfg, provider.id) ? 'ON' : 'off';
-    const remotePerm = isRemotePermEnabled(cfg, provider.id) ? 'ON' : 'off';
-    const enabled = cfg.enabledProviders.includes(provider.id) ? 'enabled' : 'disabled';
-    const symbol = status.installed ? '✓' : '✗';
-    log(`${symbol} ${provider.displayName.padEnd(14)} | ${enabled.padEnd(8)} | Hooks: ${status.installed ? 'OK' : 'MISSING'} | Remote Ask: ${remoteAsk} | Remote Perm: ${remotePerm}`);
-  }
-  log('─────────────────────────────────────────────────────────────');
-  log('');
-
   // Remote mode
-  add(true, `Remote Ask (Claude effective): ${cfg.remote ? `ON (chờ tối đa ${cfg.remoteAskTimeoutSec}s)` : 'off'}`);
+  add(true, `Remote Ask: ${cfg.remote ? `ON (chờ tối đa ${cfg.remoteAskTimeoutSec}s)` : 'off'}`);
 
   // Remote Permission — bật mà thiếu điều kiện thì hook im lặng (fail-closed), phải nói rõ.
   if (!cfg.remotePermission) {
@@ -123,6 +115,7 @@ export async function runStatus({ home = homedir(), log = console.log } = {}) {
     add(true, `Remote Permission: ON — ${cfg.allowedUserIds.length} user được duyệt, "cho phép tất cả" tối đa ${cfg.sessionAllowTtlMin}′`);
   }
 
+  log('📊 cc-notify-telegram — Claude Code');
   let allOk = true;
   for (const r of rows) {
     log(`${r.ok ? '✓' : '✗'} ${r.label}${!r.ok && r.fix ? `\n    ↳ ${r.fix}` : ''}`);

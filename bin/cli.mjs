@@ -1,17 +1,19 @@
 #!/usr/bin/env node
-// CLI cc-notify-telegram: init (mặc định) | test | status | remote on|off [provider] | uninstall
+// CLI cc-notify-telegram: init (mặc định) | test | status | remote on|off | remote-perm on|off | uninstall
 
 import { realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
 import { hasCredentials, loadConfig, makeTelegram, strings } from '../hook/notify-telegram.mjs';
-import { runCodexAppServerBridge } from '../src/codex-app-server-bridge.mjs';
 import { runInit } from '../src/init.mjs';
 import { runRemote } from '../src/remote.mjs';
 import { runStatus } from '../src/status.mjs';
+import { runTopics } from '../src/topics.mjs';
+import { runAway } from '../src/away.mjs';
 import { runUninstall } from '../src/uninstall.mjs';
 
+// providers/provider: cờ cũ thời multi-provider — vẫn nhận (để không nuốt nhầm arg sau nó) nhưng bỏ qua.
 const VALUE_FLAGS = new Set(['token', 'chat-id', 'thread-id', 'lang', 'allow-user', 'providers', 'provider']);
 
 // Cờ được phép lặp lại (--allow-user 1 --allow-user 2) → gom thành mảng thay vì ghi đè.
@@ -47,30 +49,26 @@ export function parseArgs(argv) {
   return flags;
 }
 
-const HELP = `cc-notify-telegram — AI agents ↔ Telegram
+const HELP = `cc-notify-telegram — Claude Code ↔ Telegram
 
 Cách dùng:
   npx -y github:sdc-ren/cc-notify-telegram [init]     Wizard cài đặt (token, chat ID, hooks, CLAUDE.md)
   npx -y github:sdc-ren/cc-notify-telegram test       Gửi tin test
   npx -y github:sdc-ren/cc-notify-telegram status     Kiểm tra sức khoẻ toàn chuỗi notify
+  npx -y github:sdc-ren/cc-notify-telegram topics     Liệt kê topic ID của group (để đặt threadId)
+  npx -y github:sdc-ren/cc-notify-telegram away <phút> [--skip] | away off
+                                    macOS: vừa dùng máy trong N phút thì tin báo gửi không
+                                    chuông (--skip: không gửi)
   npx -y github:sdc-ren/cc-notify-telegram remote on  Bật Remote Ask (trả lời câu hỏi của Claude qua Telegram)
   npx -y github:sdc-ren/cc-notify-telegram remote off Tắt Remote Ask (câu hỏi hiện tại máy)
-  npx -y github:sdc-ren/cc-notify-telegram remote on codex
-                                    Bật Remote Ask riêng cho provider
   npx -y github:sdc-ren/cc-notify-telegram remote-perm on|off
                                     Bật/tắt Remote Permission (duyệt hộp thoại quyền bằng
                                     nút bấm Telegram — chỉ allowedUserIds mới bấm được)
-  npx -y github:sdc-ren/cc-notify-telegram remote-perm on antigravity
-                                    Bật/tắt Remote Permission riêng cho provider
-  npx -y github:sdc-ren/cc-notify-telegram codex-bridge
-                                    Stdio proxy cho Codex App Server; intercept
-                                    item/tool/requestUserInput qua Telegram
   npx -y github:sdc-ren/cc-notify-telegram uninstall  Gỡ hooks (--purge: xoá cả config/token + CLAUDE.md block)
 
 Cờ cho init (non-interactive):
   --token <bot-token> --chat-id <id> [--thread-id <n>] [--lang vi|en]
-  [--providers claude,codex,antigravity]
-  [--silent] [--yes] [--no-test] [--no-claude-md] [--no-agent-md]
+  [--silent] [--yes] [--no-test] [--no-claude-md]
   [--remove-legacy|--keep-legacy]
   [--allow-user <telegram-user-id>]  (lặp lại được; bật luôn Remote Permission)
 `;
@@ -103,12 +101,15 @@ async function main() {
     }
     case 'status':
       return runStatus({});
-    case 'codex-bridge':
-      return runCodexAppServerBridge();
+    case 'topics':
+      return runTopics();
+    case 'away':
+      return runAway(flags._[1], flags);
+    // Arg thứ 3 (vd `remote on claude` thời multi-provider) được chấp nhận và bỏ qua.
     case 'remote':
-      return runRemote(flags._[1], { provider: flags._[2] });
+      return runRemote(flags._[1]);
     case 'remote-perm':
-      return runRemote(flags._[1], { key: 'remotePermission', provider: flags._[2] });
+      return runRemote(flags._[1], { key: 'remotePermission' });
     case 'uninstall':
       return runUninstall(flags);
     default:

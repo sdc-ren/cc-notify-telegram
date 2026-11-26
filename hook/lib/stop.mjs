@@ -1,9 +1,10 @@
 // EVENT stop — đọc tin cuối trong transcript, tách marker DONE/ESCALATE.
 
 import { existsSync, readFileSync } from 'node:fs';
-import { AI_MARKER_DONE, AI_MARKER_ESCALATE, MARKER_DONE, MARKER_ESCALATE, providerDisplayName } from './config.mjs';
-import { buildTag, projectName, strings } from './strings.mjs';
+import { MARKER_DONE, MARKER_ESCALATE } from './config.mjs';
+import { projectName, strings } from './strings.mjs';
 import { sweepSessionPending } from './ask.mjs';
+import { sendAwayAware } from './presence.mjs';
 
 export function parseJsonl(lines) {
   const out = [];
@@ -60,7 +61,7 @@ export function firstUserSnippet(lines) {
 // Tóm tắt nhúng trong marker: <!-- CC_NOTIFY_DONE: ý 1 | ý 2 --> (dòng đầu tiên khớp).
 export function extractDoneSummary(text) {
   for (const line of text.split('\n')) {
-    const m = line.match(new RegExp(`.*(?:${MARKER_DONE}|${AI_MARKER_DONE}):\\s*(.*\\S)\\s*-->.*`));
+    const m = line.match(new RegExp(`.*${MARKER_DONE}:\\s*(.*\\S)\\s*-->.*`));
     if (m) return m[1];
   }
   return '';
@@ -77,13 +78,7 @@ export function summaryToBullets(summary) {
 export function fallbackBody(text) {
   let lines = text
     .split('\n')
-    .filter(
-      (l) =>
-        !l.includes(MARKER_DONE) &&
-        !l.includes(MARKER_ESCALATE) &&
-        !l.includes(AI_MARKER_DONE) &&
-        !l.includes(AI_MARKER_ESCALATE)
-    )
+    .filter((l) => !l.includes(MARKER_DONE) && !l.includes(MARKER_ESCALATE))
     .map((l) => l.replace(/<!--[^>]*-->/g, ''));
   let start = -1;
   let end = -1;
@@ -107,12 +102,11 @@ export function extractEscalateLine(text, str) {
 }
 
 // Quyết định nội dung gửi cho event stop; trả null nếu không có marker (không gửi gì).
-export function buildStopMessage({ last, project, snippet, str, providerId }) {
-  const provider = providerId ? providerDisplayName(providerId) : undefined;
-  if (last.includes(MARKER_ESCALATE) || last.includes(AI_MARKER_ESCALATE)) {
-    return `${extractEscalateLine(last, str)}\n${str.escalateSuffix(project, provider)}`;
+export function buildStopMessage({ last, project, snippet, str }) {
+  if (last.includes(MARKER_ESCALATE)) {
+    return `${extractEscalateLine(last, str)}\n${str.escalateSuffix(project)}`;
   }
-  if (!last.includes(MARKER_DONE) && !last.includes(AI_MARKER_DONE)) return null;
+  if (!last.includes(MARKER_DONE)) return null;
 
   const summary = extractDoneSummary(last);
   if (summary) return `✅ ${project}\n${summaryToBullets(summary)}`;
@@ -123,34 +117,14 @@ export function buildStopMessage({ last, project, snippet, str, providerId }) {
   return `✅ ${project} — ${str.donePlain}`;
 }
 
-function buildTurnCompleteMessage({ last, project, snippet, str, providerId, sessionId }) {
-  const markerMessage = buildStopMessage({ last, project, snippet, str, providerId });
-  if (markerMessage) return markerMessage;
-
-  const tag = buildTag({ providerId, project, sessionId });
-  const body = fallbackBody(last || '') || (snippet ? `"${snippet}"\n${str.doneFallback}` : str.donePlain);
-  return `✅ ${tag}\n${body}`;
-}
-
 export async function runStop(payload, cfg, tg, env) {
   const transcript = payload.transcript_path;
   const hasTranscript = transcript && existsSync(transcript);
   const lines = hasTranscript ? readFileSync(transcript, 'utf8').split('\n').filter(Boolean) : [];
   const str = strings(cfg);
-  const last = payload.last_assistant_message || payload.lastAssistantMessage || lastAssistantText(lines);
-  const snippet = firstUserSnippet(lines);
-  const project = projectName(payload, env);
-  const message =
-    cfg.providerId === 'codex'
-      ? buildTurnCompleteMessage({ last, project, snippet, str, providerId: cfg.providerId, sessionId: payload.session_id })
-      : buildStopMessage({
-          last,
-          project,
-          snippet,
-          str,
-          providerId: cfg.providerId,
-        });
+  const last = payload.last_assistant_message || lastAssistantText(lines);
+  const message = buildStopMessage({ last, project: projectName(payload, env), snippet: firstUserSnippet(lines), str });
   // Quét pending mồ côi của session này (user Esc câu hỏi → PostToolUse không bắn).
   await sweepSessionPending(payload.session_id, cfg, tg).catch(() => {});
-  if (message) await tg.sendMessage(message, { providerId: cfg.providerId });
+  if (message) await sendAwayAware(tg, cfg, message);
 }

@@ -1,11 +1,10 @@
 {
   "name": "cc-notify-telegram",
   "version": "0.1.1",
-  "description": "Claude Code ↔ Telegram: báo khi xong việc/bế tắc + trả lời AskUserQuestion từ Telegram khi vắng máy (Remote Ask)",
+  "description": "Claude Code ↔ Telegram: báo khi xong việc/bế tắc, trả lời câu hỏi, duyệt quyền và plan từ Telegram khi vắng máy",
   "type": "module",
   "bin": {
-    "cc-notify-telegram": "bin/cli.mjs",
-    "ai-notify-telegram": "bin/cli.mjs"
+    "cc-notify-telegram": "bin/cli.mjs"
   },
   "files": [
     "bin/",
@@ -29,9 +28,6 @@
     "notification",
     "hooks",
     "remote-ask",
-    "codex",
-    "antigravity",
-    "ai-agent",
     "remote-approval"
   ],
   "author": "sdc-ren",

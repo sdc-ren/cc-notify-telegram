@@ -24,7 +24,7 @@ export function classifyUpdate(update, ctx) {
   if (cq) {
     if (String(cq.message?.chat?.id) !== String(ctx.chatId)) return { kind: 'ignore' };
     const messageId = cq.message?.message_id;
-    const action = String(cq.data || '').match(/^([adescl]):/)?.[1];
+    const action = String(cq.data || '').match(/^([adesl]):/)?.[1];
     if (messageId == null || !action) return { kind: 'ignore' };
     // Nút của một yêu cầu không còn chờ nữa (đã xử lý tại máy / hủy / hết hạn) → báo cho người bấm.
     if (!ctx.pending.flatMap(idsOf).includes(messageId)) {
@@ -83,7 +83,7 @@ export async function waitForReply({ tg, cfg, dir, ownMessageIds, deadline, env,
     while (Date.now() < deadline) {
       // Tắt cờ giữa chừng (user về máy) → nhả về UI local trong vài giây.
       // Đọc lại config MỖI vòng nên `remote off` / `remote-perm off` có hiệu lực ngay.
-      const live = loadConfig({ env, home, providerId: cfg.providerId });
+      const live = loadConfig({ env, home });
       if (!live.remote || (mode === 'perm' && !live.remotePermission)) return { type: 'remote-off' };
 
       // 1) inbox của mình có sẵn kết quả (poller khác phân phát)? — vào bất kỳ chunk nào
@@ -166,7 +166,7 @@ export async function waitForReply({ tg, cfg, dir, ownMessageIds, deadline, env,
         } else if (verdict.kind === 'need-reply-hint' && Date.now() - lastHintAt > 60_000) {
           lastHintAt = Date.now();
           const askCount = pending.filter((p) => p.kind !== 'perm').length;
-          await tg.sendMessage(strings(cfg).replyHint(askCount), { providerId: cfg.providerId }).catch(() => {});
+          await tg.sendMessage(strings(cfg).replyHint(askCount)).catch(() => {});
         }
       }
     }

@@ -2,15 +2,15 @@
 
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { normalizeProviderId, providerDisplayName, stateDir } from './config.mjs';
+import { stateDir } from './config.mjs';
 import { buildTag, projectName, strings } from './strings.mjs';
 import { ensureStateDirs, gcStateDir, listPending, pendingKey, pendingPath } from './state.mjs';
 import { isLocalKeyword, waitForReply } from './poller.mjs';
 
 // Full câu hỏi + FULL nhãn/mô tả mọi lựa chọn — KHÔNG cắt (chunkMessage lo phần dài).
-export function buildAskMessage(questions, { project, suffix, str, providerId }) {
-  const tag = buildTag({ providerId, project, suffix });
-  const out = [str.askHeader(tag, providerId ? providerDisplayName(providerId) : undefined), ''];
+export function buildAskMessage(questions, { project, suffix, str }) {
+  const tag = buildTag({ project, suffix });
+  const out = [str.askHeader(tag), ''];
   questions.forEach((q, qi) => {
     const multi = q.multiSelect ? ` ${str.askMulti}` : '';
     out.push(`${qi + 1}. ${q.question}${multi}`);
@@ -91,14 +91,6 @@ export function denyOutput(reason) {
   });
 }
 
-export function formatAskOutput(providerId, reason) {
-  const provider = normalizeProviderId(providerId);
-  if (provider === 'antigravity') return JSON.stringify({ decision: 'deny', reason });
-  // Codex CLI notifications do not expose a stable simple hook output contract for Ask.
-  // Keep Claude-compatible output as the safe default until a concrete app-server bridge is used.
-  return denyOutput(reason);
-}
-
 export async function promptTelegramAsk({ payload, cfg, tg, env, home = homedir(), questions, text }) {
   if (!cfg.remote) return { type: 'remote-off' };
   if (!Array.isArray(questions) || questions.length === 0) return { type: 'invalid' };
@@ -110,7 +102,7 @@ export async function promptTelegramAsk({ payload, cfg, tg, env, home = homedir(
   for (const chunk of chunkMessage(text)) {
     let sent;
     try {
-      sent = await tg.sendMessage(chunk, { providerId: cfg.providerId });
+      sent = await tg.sendMessage(chunk);
     } catch {
       break;
     }
@@ -141,7 +133,6 @@ export async function runAsk(payload, cfg, tg, env, home = homedir()) {
     project: projectName(payload, env),
     suffix: String(payload.session_id || '').slice(-4),
     str,
-    providerId: cfg.providerId,
   });
 
   const prompt = await promptTelegramAsk({ payload, cfg, tg, env, home, questions, text });
@@ -155,7 +146,7 @@ export async function runAsk(payload, cfg, tg, env, home = homedir()) {
     } catch {
       // đã bị GC
     }
-    return formatAskOutput(cfg.providerId, buildDenyReason(outcome.text, questions, str));
+    return denyOutput(buildDenyReason(outcome.text, questions, str));
   }
 
   // local / remote-off / timeout → giữ pending cho ask-done chốt sổ khi user bấm tại máy.

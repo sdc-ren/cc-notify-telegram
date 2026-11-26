@@ -2,26 +2,28 @@
 
 🌐 [English](README.md) · Tiếng Việt
 
-> ⚠️ **Chỉ nhận thông báo "xong việc", không thấy permission/plan?** `remote-perm` chỉ hoạt động khi `remote` cũng đang bật. Chạy `status`, rồi `remote on claude` và `remote-perm on claude`; xong khởi động lại session.
+> ⚠️ **Chỉ nhận thông báo "xong việc", không thấy permission/plan?** `remote-perm` chỉ hoạt động khi `remote` cũng đang bật. Chạy `status`, rồi `remote on` và `remote-perm on`; xong khởi động lại session.
 
-**Claude Code, OpenAI Codex & Google Antigravity ↔ Telegram** — để AI Agent làm việc, còn bạn đi đâu cũng được.
+**Claude Code ↔ Telegram** — để Claude Code làm việc, còn bạn đi đâu cũng được.
 
-Tool này hỗ trợ 3 AI Agent CLI/IDE hàng đầu hiện nay (**Claude Code**, **OpenAI Codex**, **Google Antigravity**), cài đặt hook & marker (cấp user — áp dụng **mọi repo** trên máy) làm 3 việc:
+Cài hook & marker cho Claude Code (cấp user — áp dụng **mọi repo** trên máy) làm 3 việc:
 
-1. **📬 Báo khi xong việc / bế tắc** — Agent hoàn thành TOÀN BỘ task thì bạn nhận một tin Telegram tóm tắt cô đọng; Agent bế tắc cần bạn can thiệp thì nhận tin 🛑.
-2. **❓ Remote Ask** — khi Agent hỏi ý kiến bạn mà bạn đang ở ngoài, câu hỏi được gửi qua Telegram; bạn **reply ngay trong Telegram** ("1A", "chọn 2", hay mô tả tự do) và câu trả lời quay về đúng session để Agent chạy tiếp. Không cần server, không webhook.
-3. **🔐 Remote Permission** *(opt-in, mặc định TẮT)* — yêu cầu xin quyền chạy lệnh/tool được gửi kèm **nút bấm**; bạn chạm ✅/⛔ là Agent chạy tiếp hoặc dừng. Chỉ những Telegram user ID bạn khai báo mới bấm được.
+1. **📬 Báo khi xong việc / bế tắc** — Claude hoàn thành TOÀN BỘ task thì bạn nhận một tin Telegram tóm tắt cô đọng; Claude bế tắc cần bạn can thiệp thì nhận tin 🛑.
+2. **❓ Remote Ask** — khi Claude hỏi ý kiến bạn mà bạn đang ở ngoài, câu hỏi được gửi qua Telegram; bạn **reply ngay trong Telegram** ("1A", "chọn 2", hay mô tả tự do) và câu trả lời quay về đúng session để Claude chạy tiếp. Không cần server, không webhook.
+3. **🔐 Remote Permission** *(opt-in, mặc định TẮT)* — yêu cầu xin quyền chạy lệnh/tool và plan được gửi kèm **nút bấm**; bạn chạm ✅/⛔ là Claude chạy tiếp hoặc dừng. Chỉ những Telegram user ID bạn khai báo mới bấm được.
 
-Ví dụ những gì bạn sẽ nhận từ các Agent:
+> **Đã bỏ hỗ trợ Codex / Antigravity.** Nếu trước đây bạn đã cài cho chúng, hãy xoá các entry `ai-notify-telegram` trong `~/.codex/hooks.json` và `~/.agents/hooks.json`.
+
+Ví dụ những gì bạn sẽ nhận:
 
 ```
-✅ [Codex · packflow]
+✅ packflow
 • Refactored API client module
 • Fixed memory leak in websocket listener
 ```
 
 ```
-❓ [Antigravity · packflow · a1b2] Antigravity đang hỏi:
+❓ [packflow · a1b2] Claude đang hỏi:
 
 1. Chọn database driver?
    A. Postgres — pg pool connection
@@ -31,10 +33,10 @@ Ví dụ những gì bạn sẽ nhận từ các Agent:
 Reply "local" nếu muốn trả lời tại máy.
 ```
 
-Bạn reply `1A` → tin được sửa thành `✅ Đã trả lời qua Telegram: "1A"` và Agent tiếp tục làm.
+Bạn reply `1A` → tin được sửa thành `✅ Đã trả lời qua Telegram: "1A"` và Claude tiếp tục làm.
 
 ```
-🔐 [Claude · cc-notify-telegram · c3d4] Claude xin quyền dùng:
+🔐 [cc-notify-telegram · c3d4] Claude xin quyền dùng:
 
 🔧 Bash
 npm test
@@ -52,7 +54,7 @@ npm test
   - [2. Chạy trình cài đặt](#2-chạy-trình-cài-đặt)
   - [3. Tạo lệnh gõ ngắn (tuỳ chọn)](#3-tạo-lệnh-gõ-ngắn-tuỳ-chọn)
 - [Sử dụng](#sử-dụng)
-- [Telegram Topics cho từng Agent](#telegram-topics-cho-từng-agent)
+- [Telegram Topics](#telegram-topics)
 - [Cách hoạt động](#cách-hoạt-động)
 - [Lệnh CLI](#lệnh-cli)
 - [Config](#config)
@@ -66,7 +68,7 @@ npm test
 ## Yêu cầu
 
 - **Node.js ≥ 22** và `git` (gói được cài thẳng từ GitHub).
-- Một hoặc nhiều AI Agent: **Claude Code**, **OpenAI Codex**, **Google Antigravity**.
+- **Claude Code**.
 - Một **bot Telegram** (miễn phí, tạo trong 1 phút — hướng dẫn ngay dưới).
 - macOS / Linux / Windows (CI chạy test trên cả 3).
 
@@ -88,15 +90,14 @@ npx -y github:sdc-ren/cc-notify-telegram
 
 Lần chạy đầu phải tải repo nên mất vài giây. Wizard dẫn từng bước:
 
-1. **Chọn AI Agent** — Claude Code, OpenAI Codex, Google Antigravity (hoặc cả 3).
-2. **Bot token** — dán token từ BotFather (xác thực ngay bằng `getMe`).
-3. **Chat ID** — bấm Enter để wizard **tự dò** các chat/topic bot vừa thấy và chọn từ danh sách (hoặc gõ thẳng ID nếu đã biết).
-4. Wizard tự làm phần còn lại:
+1. **Bot token** — dán token từ BotFather (xác thực ngay bằng `getMe`).
+2. **Chat ID** — bấm Enter để wizard **tự dò** các chat/topic bot vừa thấy và chọn từ danh sách (hoặc gõ thẳng ID nếu đã biết).
+3. Wizard tự làm phần còn lại:
+   - hỏi có bật **Remote Permission** không (mặc định *không*); đồng ý thì dò luôn Telegram user ID được phép duyệt,
    - ghi config vào `~/.config/ai-notify-telegram/config.json` (chmod 600, tự chuyển đổi từ config `~/.claude/` cũ nếu có),
    - copy hook runtime vào `~/.claude/hooks/cc-notify-telegram/` (kèm shim `~/.claude/hooks/cc-notify-telegram.mjs` mà settings trỏ tới),
-   - đăng ký hooks vào cấu hình từng Agent (`~/.claude/settings.json`, `~/.codex/config.json`, `~/.gemini/config/settings.json`),
-   - hỏi có bật **Remote Permission** không (mặc định *không*); đồng ý thì dò luôn Telegram user ID được phép duyệt,
-   - hỏi trước khi thêm block hướng dẫn marker vào `CLAUDE.md`, `CODEX.md`, `AGENTS.md`,
+   - đăng ký hooks vào `~/.claude/settings.json` (có backup trước khi ghi),
+   - hỏi trước khi thêm block hướng dẫn marker vào `~/.claude/CLAUDE.md`,
    - gửi một **tin test** để xác nhận thông suốt.
 
 Cài không cần hỏi đáp (CI, dotfiles):
@@ -104,7 +105,6 @@ Cài không cần hỏi đáp (CI, dotfiles):
 ```bash
 npx -y github:sdc-ren/cc-notify-telegram init \
   --token "123456789:AAxxx" --chat-id "-1001234567890" --yes
-# Tuỳ chọn chọn provider: --provider claude,codex,antigravity (hoặc --provider all)
 # Tuỳ chọn: --thread-id 42  --lang en  --silent  --no-test  --no-claude-md
 # Bật luôn Remote Permission (lặp --allow-user được, hoặc ngăn cách bằng dấu phẩy):
 #   --allow-user 111222333 --allow-user 444555666
@@ -116,7 +116,7 @@ Muốn khoá phiên bản, thêm nhánh, tag hoặc commit: `github:sdc-ren/cc-n
 
 Gõ `npx -y github:sdc-ren/cc-notify-telegram ...` mỗi lần rất dài. Chọn **một** trong hai cách dưới. Hook mà trình cài đặt đăng ký **không phụ thuộc** bước này; nó chỉ giúp gọi CLI (`status`, `remote on`, ...) tiện hơn.
 
-**Cách A: cài global (khuyên dùng).** Tạo lệnh thật `cc-notify-telegram` và `ai-notify-telegram`, chạy được ở mọi shell, không phải sửa rc file.
+**Cách A: cài global (khuyên dùng).** Tạo lệnh thật `cc-notify-telegram`, chạy được ở mọi shell, không phải sửa rc file.
 
 ```bash
 npm i -g github:sdc-ren/cc-notify-telegram
@@ -138,7 +138,7 @@ Sau đó dùng:
 
 ```bash
 cc-notify status
-cc-notify remote on claude
+cc-notify remote on
 ```
 
 Alias chỉ có trong shell tương tác, không dùng được trong script hay CI. Ở đó hãy dùng dạng đầy đủ `npx -y github:...` hoặc Cách A.
@@ -156,9 +156,9 @@ cc-notify-telegram remote on          # Remote Ask
 cc-notify-telegram remote-perm on     # Remote Permission (cần allowedUserIds)
 ```
 
-> **Lưu ý quan trọng: `remote-perm` yêu cầu `remote` đang bật.** Tin permission và plan chỉ được gửi khi công tắc `remote` (toàn cục *và* theo Agent) bật. Nếu `status` hiện `Remote Ask: off` thì bạn sẽ không nhận tin permission/plan dù Remote Permission đã bật.
+> **Lưu ý quan trọng: `remote-perm` yêu cầu `remote` đang bật.** Tin permission và plan chỉ được gửi khi công tắc `remote` bật. Nếu `status` hiện `Remote Ask: off` thì bạn sẽ không nhận tin permission/plan dù Remote Permission đã bật.
 
-Khởi động lại session Agent sau khi đổi công tắc, rồi kiểm tra:
+Khởi động lại session Claude Code sau khi đổi công tắc, rồi kiểm tra:
 
 ```bash
 cc-notify-telegram status
@@ -166,28 +166,16 @@ cc-notify-telegram status
 
 ---
 
-## Telegram Topics cho từng Agent
+## Telegram Topics
 
-Nếu Telegram group bật **Topics/Forum**, bạn có thể tách tin của từng Agent vào topic riêng bằng `providerThreads`.
-
-Ví dụ:
+Nếu Telegram group bật **Topics/Forum**, bạn có thể gửi toàn bộ tin vào một topic bằng `threadId` (hoặc `--thread-id` khi cài):
 
 ```json
 {
   "chatId": "-1001234567890",
-  "providerThreads": {
-    "claude": 5,
-    "codex": 6,
-    "antigravity": 7
-  }
+  "threadId": 5
 }
 ```
-
-Khi đó:
-
-- Tin từ Claude Code gửi vào topic `message_thread_id = 5`
-- Tin từ Codex gửi vào topic `message_thread_id = 6`
-- Tin từ Antigravity gửi vào topic `message_thread_id = 7`
 
 Điều kiện cần:
 
@@ -197,22 +185,14 @@ Khi đó:
 
 Cách lấy `message_thread_id` khi đã có topic:
 
-1. Vào từng topic, mention bot một tin, ví dụ `@your_bot claude topic`.
-2. Chạy đoạn dưới để liệt kê topic ID bot vừa thấy:
+1. Vào topic muốn dùng, mention bot một tin, ví dụ `@your_bot topic`.
+2. Liệt kê topic ID bot vừa thấy:
 
 ```bash
-node -e "import('node:fs').then(async fs=>{const p=process.env.HOME+'/.config/ai-notify-telegram/config.json';const c=JSON.parse(fs.readFileSync(p,'utf8'));const r=await fetch('https://api.telegram.org/bot'+c.botToken+'/getUpdates',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({offset:-100,timeout:0,allowed_updates:['message','callback_query']})});const j=await r.json();const out=[];for(const u of j.result||[]){const m=u.message||u.callback_query?.message;if(String(m?.chat?.id)===String(c.chatId)&&m.message_thread_id!=null)out.push({message_thread_id:m.message_thread_id,text:m.text||''});}console.log(JSON.stringify(out,null,2));})"
+cc-notify-telegram topics
 ```
 
-3. Ghi các ID đó vào `~/.config/ai-notify-telegram/config.json`:
-
-```json
-"providerThreads": {
-  "claude": 5,
-  "codex": 6,
-  "antigravity": 7
-}
-```
+3. Ghi ID đó vào `threadId` trong `~/.config/ai-notify-telegram/config.json`.
 
 Nếu topic ID sai hoặc topic bị xoá, tool sẽ thử fallback gửi về group chính để không mất thông báo.
 
@@ -220,59 +200,46 @@ Nếu topic ID sai hoặc topic bị xoá, tool sẽ thử fallback gửi về g
 
 ## Cách hoạt động
 
-**Notify khi xong việc — giao thức marker.** Block hướng dẫn trong `CLAUDE.md`, `CODEX.md`, hoặc `AGENTS.md` dặn Agent: *khi (và chỉ khi) xong hẳn toàn bộ việc*, kết thúc tin nhắn cuối bằng một HTML comment ẩn `<!-- AI_NOTIFY_DONE: ý 1 | ý 2 -->` (tương thích cả `<!-- CC_NOTIFY_DONE: ... -->`). Stop hook đọc tin cuối trong transcript/history, thấy marker thì tách tóm tắt gửi Telegram (mỗi `|` một bullet).
+**Notify khi xong việc — giao thức marker.** Block hướng dẫn trong `~/.claude/CLAUDE.md` dặn Claude: *khi (và chỉ khi) xong hẳn toàn bộ việc*, kết thúc tin nhắn cuối bằng một HTML comment ẩn `<!-- CC_NOTIFY_DONE: ý 1 | ý 2 -->`; bế tắc thì kết thúc bằng dòng `🛑` kèm `<!-- CC_NOTIFY_ESCALATE -->`. Stop hook đọc tin cuối trong transcript, thấy marker thì tách tóm tắt gửi Telegram (mỗi `|` một bullet).
 
 ```
-Agent xong việc ─▶ tin cuối chứa <!-- AI_NOTIFY_DONE: … -->
+Claude xong việc ─▶ tin cuối chứa <!-- CC_NOTIFY_DONE: … -->
                         │ Stop hook (stop)
                         ▼
-                 📬 Telegram: "✅ [Codex · project] • ý 1 • ý 2"
+                 📬 Telegram: "✅ project • ý 1 • ý 2"
 ```
 
-**Remote Ask.** Khi bật (`remote on`), hook PreToolUse / Ask Interceptor chặn câu hỏi *trước khi* UI hiện, gửi câu hỏi + options qua Telegram rồi đứng chờ reply (long-poll `getUpdates`):
+**Remote Ask.** Khi bật (`remote on`), hook PreToolUse trên `AskUserQuestion` chặn câu hỏi *trước khi* UI hiện, gửi câu hỏi + options qua Telegram rồi đứng chờ reply (long-poll `getUpdates`):
 
 ```
-Agent hỏi ý kiến user
-   │ PreToolUse / Ask Interceptor                bạn ở ngoài 🚶
+Claude hỏi ý kiến user
+   │ PreToolUse (AskUserQuestion)                bạn ở ngoài 🚶
    ├─▶ ❓ gửi câu hỏi lên Telegram ──────────────▶ bạn REPLY "1A"
    │◀───────────── nhận reply ────────────────────┘
    ▼
-trả câu trả lời về Agent → Agent chạy tiếp
+trả câu trả lời về Claude → Claude chạy tiếp
    └─▶ tin câu hỏi được sửa thành "✅ Đã trả lời qua Telegram: 1A"
 ```
 
 Không ai reply trong `remoteAskTimeoutSec` (mặc định 15 phút) → câu hỏi **tự nhả về UI tại máy** như bình thường, tin Telegram được sửa thành "⏰ … đang chờ tại máy".
 
-> Codex note: completion uses the official `Stop` lifecycle hook, and remote permission uses `PermissionRequest`. Remote Ask for Codex needs a Codex App Server bridge (`tool/requestUserInput`, experimental) and should not be treated as equivalent to Claude `AskUserQuestion` hooks yet.
-
-**Codex App Server bridge.** Với client có thể launch Codex App Server qua stdio, dùng `cc-notify-telegram codex-bridge` làm app-server command. Bridge proxy JSON-RPC giữa client và `codex app-server --stdio`, bật experimental App Server API, rồi intercept request thật `item/tool/requestUserInput` và các App Server approval request:
+**Remote Permission.** Khi bật (`remote-perm on`, cần `remote on` sẵn), hook PermissionRequest chặn *đúng lúc hộp thoại quyền sắp hiện*, gửi nguyên văn thứ đang được xin quyền kèm 4 nút:
 
 ```
-Codex client ──JSON-RPC──▶ cc-notify-telegram codex-bridge ──JSON-RPC──▶ codex app-server --stdio
-                                │
-                                ├─▶ ❓ Telegram reply → { answers: [...] } → app-server
-                                └─▶ 🔐 Telegram buttons → approval decision → app-server
-```
-
-Nếu Telegram timeout hoặc bạn reply/chọn `local`, request được trả về client local xử lý. Bridge hỗ trợ `item/commandExecution/requestApproval`, `item/fileChange/requestApproval`, `item/permissions/requestApproval`, `execCommandApproval`, và `applyPatchApproval`. Với `item/permissions/requestApproval`, Deny được map thành grant rỗng vì App Server schema hiện không có decision `decline` riêng cho loại request này.
-
-**Remote Permission.** Khi bật (`remote-perm on`, cần `remote on` sẵn), hook Permission Interceptor chặn *đúng lúc hộp thoại quyền sắp hiện*, gửi nguyên văn thứ đang được xin quyền kèm 4 nút:
-
-```
-Agent cần quyền chạy lệnh
-   │ PermissionRequest / Approval Hook            bạn ở ngoài 🚶
+Claude cần quyền chạy lệnh
+   │ PermissionRequest                            bạn ở ngoài 🚶
    ├─▶ 🔐 gửi tool + nội dung + nút ─────────────▶ bạn CHẠM [✅ Cho phép]
    │◀───────────── nhận callback ─────────────────┘   (kiểm from.id ∈ allowlist)
    ▼
-trả decision allow/deny về Agent → lệnh chạy / bị chặn
+trả decision allow/deny về Claude → lệnh chạy / bị chặn
    └─▶ tin đổi thành "✅ Đã cho phép (Sơn)" và bàn phím nút biến mất
 ```
 
 
-**Duyệt / góp ý plan (Claude Code).** Khi Claude gọi `ExitPlanMode`, plan được gửi lên Telegram dưới dạng **danh sách đủ các bước chính** (tiêu đề + mỗi bước một dòng ngắn; bỏ đường dẫn file, bối cảnh, phạm vi thay đổi, phần kiểm chứng) kèm nút:
+**Duyệt / góp ý plan.** Khi Claude gọi `ExitPlanMode`, plan được gửi lên Telegram dưới dạng **danh sách đủ các bước chính** (tiêu đề + mỗi bước một dòng ngắn; bỏ đường dẫn file, bối cảnh, phạm vi thay đổi, phần kiểm chứng) kèm nút:
 
 ```
-📋 [Claude · proj · c3d4] Claude Code có plan cần bạn duyệt:
+📋 [proj · c3d4] Claude Code có plan cần bạn duyệt:
 
 📌 <tiêu đề plan>
 
@@ -288,7 +255,7 @@ trả decision allow/deny về Agent → lệnh chạy / bị chặn
 
 - **Duyệt** thoát plan mode và bắt đầu làm. "Duyệt + tự sửa file" còn chuyển session sang `acceptEdits`.
 - **Review / yêu cầu sửa:** *reply vào tin plan* với góp ý của bạn. Claude giữ nguyên plan mode, sửa plan rồi trình lại. Nút "Chưa ổn" cũng vậy nhưng không kèm góp ý.
-- **Câu hỏi mở được hỏi trước.** Nếu plan còn mục "Câu hỏi mở" hoặc "Quyết định cần chốt", Telegram nhận các câu hỏi đó đầy đủ (reply câu trả lời, hoặc bấm *Claude tự quyết*). Claude dựng lại plan không còn câu hỏi, rồi danh sách các bước mới được gửi. Snippet `CLAUDE.md` cũng dặn Claude hỏi những câu này bằng `AskUserQuestion` trước khi trình plan.
+- **Câu hỏi mở được hỏi trước khi trình plan.** Snippet `CLAUDE.md` dặn Claude hỏi bằng `AskUserQuestion` (tới Telegram qua Remote Ask) trước khi trình plan. Các mục như "Câu hỏi mở" hay "Quyết định cần chốt" không được đưa vào danh sách bước.
 - Muốn nhận nguyên văn plan? Đặt `"planDetail": "full"` (hoặc `CC_NOTIFY_PLAN_DETAIL=full`).
 - Nếu bạn duyệt hoặc hủy ngay tại máy, tin Telegram tự đóng ("đã xử lý tại máy hoặc đã hủy") và nút biến mất. Bấm vào nút cũ sẽ hiện thông báo ngắn "yêu cầu đã đóng".
 - Chỉ `allowedUserIds` mới bấm nút hoặc góp ý được. Nếu bạn reply `local`, hết giờ chờ, hoặc không đọc được nội dung plan thì hộp thoại plan vẫn hiện tại máy như bình thường.
@@ -299,19 +266,16 @@ trả decision allow/deny về Agent → lệnh chạy / bị chặn
 
 ## Lệnh CLI
 
-Hỗ trợ cả lệnh `cc-notify-telegram` và alias `ai-notify-telegram`:
-
 | Lệnh | Việc |
 |---|---|
-| `cc-notify-telegram` *(hoặc `init`)* | Wizard cài đặt / cài lại / đổi config cho các Agent |
+| `cc-notify-telegram` *(hoặc `init`)* | Wizard cài đặt / cài lại / đổi config |
 | `cc-notify-telegram test` | Gửi tin test |
-| `cc-notify-telegram status` | Doctor: Dashboard matrix kiểm tra sức khỏe của Claude Code, Codex, Antigravity |
-| `cc-notify-telegram remote on [provider]` | Bật Remote Ask toàn cục hoặc cho riêng từng Agent (`claude`, `antigravity`; Codex Ask cần App Server bridge) |
-| `cc-notify-telegram remote off [provider]` | Tắt Remote Ask toàn cục hoặc cho riêng từng Agent |
-| `cc-notify-telegram remote-perm on [provider]` | Bật Remote Permission toàn cục hoặc cho riêng từng Agent |
-| `cc-notify-telegram remote-perm off [provider]` | Tắt Remote Permission toàn cục hoặc cho riêng từng Agent |
-| `cc-notify-telegram codex-bridge` | Stdio proxy cho Codex App Server, intercept ASK và approval requests qua Telegram |
-| `cc-notify-telegram uninstall` | Gỡ hooks khỏi các Agent (`--purge`: xoá cả config/token, state, block instruction) |
+| `cc-notify-telegram status` | Doctor: kiểm tra từng mắt xích của chuỗi notify, kèm cách sửa |
+| `cc-notify-telegram topics` | Liệt kê topic ID của group mà bot vừa thấy (để đặt `threadId`) |
+| `cc-notify-telegram away <phút> [--skip]` / `away off` | macOS: vừa dùng máy trong N phút thì tin xong việc/🛑/thông báo gửi không chuông (`--skip`: không gửi). Câu hỏi, xin quyền, duyệt plan không bị ảnh hưởng |
+| `cc-notify-telegram remote on\|off` | Bật/tắt Remote Ask |
+| `cc-notify-telegram remote-perm on\|off` | Bật/tắt Remote Permission (và duyệt plan) |
+| `cc-notify-telegram uninstall` | Gỡ hooks (`--purge`: xoá cả config/token, state, block trong `CLAUDE.md`) |
 
 ---
 
@@ -323,17 +287,17 @@ File `~/.config/ai-notify-telegram/config.json` (chmod 600 — chứa token, **k
 |---|---|---|---|
 | `botToken` | ✅ | — | Token từ @BotFather |
 | `chatId` | ✅ | — | ID group/chat nhận tin (group thường là số âm `-100…`) |
-| `threadId` | | — | ID topic mặc định khi group bật Topics (tin vào đúng topic) |
-| `providerThreads` | | `{}` | Cấu hình topic ID riêng cho từng Agent (ví dụ: `{ "claude": 12, "codex": 34, "antigravity": 56 }`) |
-| `enabledProviders` | | `["claude", "codex", "antigravity"]` | Danh sách Agent đang được kích hoạt |
+| `threadId` | | — | ID topic khi group bật Topics (tin vào đúng topic) |
 | `lang` | | `vi` | Ngôn ngữ tin nhắn + snippet instruction (`vi`/`en`) |
 | `silent` | | `false` | `true` = tin đến không rung chuông (`disable_notification`) |
-| `remote` | | `{"global": false}` | Trạng thái Remote Ask toàn cục & cho từng Agent |
+| `remote` | | `false` | Công tắc Remote Ask |
 | `remoteAskTimeoutSec` | | `900` | Thời gian chờ reply/bấm nút trước khi nhả về máy (trần 1770) |
-| `remotePermission` | | `{"global": false}` | Trạng thái Remote Permission toàn cục & cho từng Agent |
+| `remotePermission` | | `false` | Công tắc Remote Permission |
 | `allowedUserIds` | | `[]` | Telegram user ID được quyền duyệt permission. **Rỗng = không ai duyệt được** |
 | `sessionAllowTtlMin` | | `30` | Hạn của nút "Cho phép tất cả trong session này" (trần 480) |
 | `planDetail` | | `summary` | `summary` gửi tiêu đề và các bước chính của plan; `full` gửi nguyên văn plan |
+| `awayMinutes` | | `0` (tắt) | Chỉ macOS. Dùng máy trong số phút này = đang ngồi ở máy (đặt bằng lệnh `away`) |
+| `whenPresent` | | `silent` | Khi đang ngồi ở máy, tin xong việc/🛑/thông báo: `silent` (không chuông) hoặc `skip` (không gửi) |
 
 Env override (ưu tiên hơn file — tiện CI): `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_THREAD_ID`, `CC_NOTIFY_REMOTE`, `CC_NOTIFY_REMOTE_PERM`, `CC_NOTIFY_PLAN_DETAIL`.
 
@@ -342,13 +306,13 @@ Env override (ưu tiên hơn file — tiện CI): `TELEGRAM_BOT_TOKEN`, `TELEGRA
 ## Troubleshooting & Bảo mật
 
 - **Token nằm local**: `~/.config/ai-notify-telegram/config.json`, chmod 600, đã ignore mẫu trong `.gitignore`.
-- **Phân biệt Agent & Session rõ ràng**: Mọi tin nhắn đều mang Tag `[Agent · Project · Session]`, đảm bảo câu trả lời về đúng phiên làm việc.
+- **Phân biệt Session rõ ràng**: Tin câu hỏi, xin quyền và plan đều mang tag `[Project · Session]`, đảm bảo câu trả lời về đúng phiên làm việc.
 - **Fail-Closed Authorization**: `allowedUserIds` kiểm tra Telegram `from.id` (do Telegram server ký, không thể giả mạo). Rỗng = không ai duyệt được từ xa.
 - **Fail-Safe Fallback**: Mất mạng / hết hạn chờ / lỗi Telegram → tự động chuyển về giao diện máy local, không bao giờ tự động duyệt.
 - **Smart Topic Fallback**: Nếu `threadId` không hợp lệ hoặc Topic bị xóa, tin nhắn tự động fallback về chat chính của Group.
 - **`group chat was upgraded to a supergroup chat`**: Telegram đã đổi group thường thành supergroup, nên `chatId` cũ không dùng được nữa. Lỗi Telegram thường kèm `migrate_to_chat_id`; cập nhật `chatId` trong `~/.config/ai-notify-telegram/config.json` sang ID mới dạng `-100...`, rồi chạy lại `cc-notify-telegram test`.
 - **`The operation was aborted due to timeout` / `fetch failed`**: thường là Telegram API hoặc mạng đang chậm/chặn kết nối. Bản mới dùng timeout 30 giây và báo lỗi rõ hơn. Hãy retry, kiểm tra mạng/VPN/proxy, rồi chạy `cc-notify-telegram test`. Nếu dùng bản cache cũ, chạy từ GitHub repo mới nhất: `npx -y github:sdc-ren/cc-notify-telegram test`.
-- **Tin không vào đúng topic**: kiểm tra `providerThreads` có đúng provider key (`claude`, `codex`, `antigravity`) và đúng `message_thread_id`. `threadId` là topic mặc định; `providerThreads.<provider>` sẽ ưu tiên hơn `threadId`.
+- **Tin không vào đúng topic**: kiểm tra `threadId` có đúng `message_thread_id` mà lệnh lấy topic ID ở trên in ra.
 
 ---
 

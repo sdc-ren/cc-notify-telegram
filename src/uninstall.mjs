@@ -1,29 +1,17 @@
-// Gỡ cài đặt: bỏ 4 entry khỏi settings.json (có backup), xoá hook file.
+// Gỡ cài đặt: bỏ 5 entry khỏi settings.json (có backup), xoá hook file.
 // --purge: xoá thêm config (token), state dir và block CLAUDE.md.
 
 import { copyFileSync, existsSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 
-import { legacyStateDir, stateDir } from '../hook/notify-telegram.mjs';
+import { configFile, legacyConfigFile, legacyStateDir, stateDir } from '../hook/notify-telegram.mjs';
 import { removeHookRuntime } from './hook-runtime.mjs';
-import { configPath, legacyConfigPath } from './config.mjs';
 import { installPaths } from './init.mjs';
 import { removeOurEntries } from './settings.mjs';
 import { hasBlock, removeBlock } from './snippet.mjs';
-import { ProviderRegistry } from './providers/index.mjs';
 
 export async function runUninstall(flags, { home = homedir(), log = console.log } = {}) {
   const paths = installPaths(home);
-  const registry = new ProviderRegistry();
-
-  for (const provider of registry.getAll().filter((p) => p.id !== 'claude')) {
-    try {
-      const result = await provider.unregisterHooks({ home });
-      if (result.removedFiles.length) log(`✅ Đã gỡ ${provider.displayName}: ${result.removedFiles.join(', ')}`);
-    } catch (err) {
-      log(`⚠️  Không gỡ được ${provider.displayName}: ${err.message}`);
-    }
-  }
 
   if (existsSync(paths.settingsFile)) {
     try {
@@ -43,7 +31,7 @@ export async function runUninstall(flags, { home = homedir(), log = console.log 
   for (const removed of removeHookRuntime(paths.hookFile)) log(`✅ Đã xoá ${removed}`);
 
   if (flags.purge) {
-    for (const cfgFile of [configPath(home), legacyConfigPath(home)]) {
+    for (const cfgFile of [configFile(home), legacyConfigFile(home)]) {
       if (existsSync(cfgFile)) {
         unlinkSync(cfgFile);
         log(`✅ Đã xoá config: ${cfgFile}`);
