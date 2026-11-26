@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/sdc-ren/cc-notify-telegram/actions/workflows/ci.yml/badge.svg)](https://github.com/sdc-ren/cc-notify-telegram/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Node](https://img.shields.io/badge/node-%3E%3D18.17-brightgreen)
+![Node](https://img.shields.io/badge/node-%3E%3D22-brightgreen)
 
 **Let your AI coding agent work while you step away.** Get Telegram pings when a task finishes, answer the agent's questions from your phone, and approve or deny tool permissions with a tap.
 
@@ -60,7 +60,7 @@ Every message carries an `[Agent · Project · Session]` tag so replies always r
 
 ## Requirements
 
-- Node.js **18.17+** and `git` (the package is installed from GitHub)
+- Node.js **22+** and `git` (the package is installed from GitHub)
 - At least one of: Claude Code, OpenAI Codex, Google Antigravity
 - A Telegram bot (free, about a minute to create)
 - macOS, Linux or Windows (CI runs on all three)
@@ -300,7 +300,7 @@ cd cc-notify-telegram
 npm test        # node --test, no dependencies to install
 ```
 
-Please add or update tests for behavior changes. CI runs on Ubuntu, macOS and Windows with Node 18 and 22.
+Please add or update tests for behavior changes. CI runs Node 22 and 26 on Ubuntu, and Node 26 on macOS and Windows.
 
 ## License
 

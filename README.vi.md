@@ -65,7 +65,7 @@ npm test
 
 ## Yêu cầu
 
-- **Node.js ≥ 18.17** và `git` (gói được cài thẳng từ GitHub).
+- **Node.js ≥ 22** và `git` (gói được cài thẳng từ GitHub).
 - Một hoặc nhiều AI Agent: **Claude Code**, **OpenAI Codex**, **Google Antigravity**.
 - Một **bot Telegram** (miễn phí, tạo trong 1 phút — hướng dẫn ngay dưới).
 - macOS / Linux / Windows (CI chạy test trên cả 3).
@@ -371,7 +371,7 @@ cd cc-notify-telegram
 npm test        # node --test, không cần cài dependency
 ```
 
-Hãy thêm/cập nhật test khi đổi hành vi. CI chạy trên Ubuntu, macOS, Windows với Node 18 và 22. Báo lỗ hổng bảo mật qua GitHub private security advisory, không mở issue công khai.
+Hãy thêm/cập nhật test khi đổi hành vi. CI chạy Node 22 và 26 trên Ubuntu, Node 26 trên macOS và Windows. Báo lỗ hổng bảo mật qua GitHub private security advisory, không mở issue công khai.
 
 ## Giấy phép
 
