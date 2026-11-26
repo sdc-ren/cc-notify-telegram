@@ -34,6 +34,7 @@ export * from './lib/ask.mjs';
 export * from './lib/plan.mjs';
 export * from './lib/perm.mjs';
 export * from './lib/notify.mjs';
+export * from './lib/presence.mjs';
 
 // ---------------------------------------------------------------------------
 // main

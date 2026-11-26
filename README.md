@@ -213,6 +213,7 @@ answer returned to Claude → it continues
 | `test` | Send a test message |
 | `status` | Health check of the whole notify chain, with how to fix each problem |
 | `topics` | List the group's topic IDs the bot has seen recently (for `threadId`) |
+| `away <minutes> [--skip]` / `away off` | macOS: if you used the Mac in the last N minutes, completion/🛑/notification messages arrive without sound (`--skip`: not sent). Questions, permissions and plans are unaffected |
 | `remote on\|off` | Toggle Remote Ask |
 | `remote-perm on\|off` | Toggle Remote Permission (and plan review) |
 | `uninstall [--purge]` | Remove hooks. `--purge` also removes config/token, state and the `CLAUDE.md` block |
@@ -234,6 +235,8 @@ answer returned to Claude → it continues
 | `allowedUserIds` | | `[]` | Telegram user IDs allowed to approve. **Empty = nobody** |
 | `sessionAllowTtlMin` | | `30` | Lifetime of "Allow all in this session" (max 480) |
 | `planDetail` | | `summary` | `summary` sends the plan's title and main steps; `full` sends the whole plan text |
+| `awayMinutes` | | `0` (off) | macOS only. Used the Mac within this many minutes = you are present (set with `away`) |
+| `whenPresent` | | `silent` | What to do with completion/🛑/notification messages while present: `silent` or `skip` |
 
 Environment overrides: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_THREAD_ID`, `CC_NOTIFY_REMOTE`, `CC_NOTIFY_REMOTE_PERM`, `CC_NOTIFY_PLAN_DETAIL`.
 

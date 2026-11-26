@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { MARKER_DONE, MARKER_ESCALATE } from './config.mjs';
 import { projectName, strings } from './strings.mjs';
 import { sweepSessionPending } from './ask.mjs';
+import { sendAwayAware } from './presence.mjs';
 
 export function parseJsonl(lines) {
   const out = [];
@@ -125,5 +126,5 @@ export async function runStop(payload, cfg, tg, env) {
   const message = buildStopMessage({ last, project: projectName(payload, env), snippet: firstUserSnippet(lines), str });
   // Quét pending mồ côi của session này (user Esc câu hỏi → PostToolUse không bắn).
   await sweepSessionPending(payload.session_id, cfg, tg).catch(() => {});
-  if (message) await tg.sendMessage(message);
+  if (message) await sendAwayAware(tg, cfg, message);
 }

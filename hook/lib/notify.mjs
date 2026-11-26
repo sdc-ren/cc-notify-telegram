@@ -3,6 +3,7 @@
 import { homedir } from 'node:os';
 import { buildTag, projectName, strings } from './strings.mjs';
 import { sweepSessionPending } from './ask.mjs';
+import { sendAwayAware } from './presence.mjs';
 
 // Message của Notification kiểu "cần duyệt plan" (nhận diện để KHÔNG lọc nhầm khi chống trùng).
 const PLAN_MESSAGE_RE = /\bplan\b/i;
@@ -30,5 +31,5 @@ export async function runNotify(payload, cfg, tg, env) {
   if (!message || typeof message !== 'string') return;
   if (shouldSkipNotification(payload.notification_type, message, cfg)) return;
   const tag = buildTag({ project: projectName(payload, env), sessionId: payload.session_id });
-  await tg.sendMessage(`${strings(cfg).notifyPrefix} ${tag} ${message}`);
+  await sendAwayAware(tg, cfg, `${strings(cfg).notifyPrefix} ${tag} ${message}`);
 }

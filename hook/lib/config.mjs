@@ -94,6 +94,9 @@ export function loadConfig({ env = process.env, home = homedir() } = {}) {
       .map((id) => String(id).trim())
       .filter(Boolean),
     sessionAllowTtlMin: Number.isFinite(ttl) && ttl > 0 ? Math.min(ttl, MAX_SESSION_ALLOW_MIN) : 30,
+    // Chỉ báo khi vắng máy (macOS): 0 = tắt. whenPresent: 'silent' (mặc định) | 'skip'.
+    awayMinutes: Number.isFinite(Number(file.awayMinutes)) && Number(file.awayMinutes) > 0 ? Number(file.awayMinutes) : 0,
+    whenPresent: file.whenPresent === 'skip' ? 'skip' : 'silent',
     remoteAskTimeoutSec:
       Number.isFinite(timeout) && timeout > 0 ? Math.min(timeout, MAX_ASK_TIMEOUT_SEC) : 900,
   };
