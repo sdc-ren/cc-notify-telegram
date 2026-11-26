@@ -22,6 +22,9 @@ All notable changes to this project are documented here. The format is based on
 - `status` warns when the installed hook differs from the CLI you are running.
 
 ### Changed
+- "Claude is waiting for your input" (idle) notifications are no longer forwarded
+  to Telegram; completion and 🛑 messages already cover it, and idle also fired
+  while Claude only waited for background work.
 - Message tags are now `[project · ab12]` (no agent name).
 - The hook runtime is split into modules and installed as
   `~/.claude/hooks/cc-notify-telegram/` plus a small entry shim at the old path,
