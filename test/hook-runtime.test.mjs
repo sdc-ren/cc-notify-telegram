@@ -7,8 +7,10 @@ import { join } from 'node:path';
 import {
   installHookRuntime,
   isHookRuntimeInstalled,
+  isHookRuntimeStale,
   removeHookRuntime,
   runtimeDir,
+  runtimeFingerprint,
   SHIM,
 } from '../src/hook-runtime.mjs';
 
@@ -98,6 +100,39 @@ test('removeHookRuntime: xoá shim lẫn thư mục runtime', () => {
     assert.equal(existsSync(hookFile), false);
     assert.equal(existsSync(runtimeDir(hookFile)), false);
     assert.equal(isHookRuntimeInstalled(hookFile), false);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('isHookRuntimeStale: vừa cài thì khớp; sửa một file runtime thì báo cũ', () => {
+  const home = tempHome();
+  try {
+    const hookFile = join(home, 'hooks', 'cc-notify-telegram.mjs');
+    installHookRuntime(hookFile);
+    assert.equal(isHookRuntimeStale(hookFile), false);
+    const file = join(runtimeDir(hookFile), 'lib', 'config.mjs');
+    writeFileSync(file, readFileSync(file, 'utf8') + '\n// sửa\n');
+    assert.equal(isHookRuntimeStale(hookFile), true);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('runtimeFingerprint: null khi chưa có thư mục, không phụ thuộc thứ tự đọc', () => {
+  const home = tempHome();
+  try {
+    assert.equal(runtimeFingerprint(join(home, 'missing')), null);
+    const a = join(home, 'a');
+    const b = join(home, 'b');
+    mkdirSync(join(a, 'lib'), { recursive: true });
+    mkdirSync(join(b, 'lib'), { recursive: true });
+    writeFileSync(join(a, 'x.mjs'), '1');
+    writeFileSync(join(a, 'lib', 'y.mjs'), '2');
+    writeFileSync(join(b, 'lib', 'y.mjs'), '2');
+    writeFileSync(join(b, 'x.mjs'), '1');
+    writeFileSync(join(b, 'notes.txt'), 'bỏ qua');
+    assert.equal(runtimeFingerprint(a), runtimeFingerprint(b));
   } finally {
     rmSync(home, { recursive: true, force: true });
   }

@@ -14,7 +14,7 @@ import {
 import { HOOK_ENTRIES } from './settings.mjs';
 import { hasBlock } from './snippet.mjs';
 import { installPaths } from './init.mjs';
-import { isHookRuntimeInstalled, runtimeDir } from './hook-runtime.mjs';
+import { isHookRuntimeInstalled, isHookRuntimeStale, runtimeDir } from './hook-runtime.mjs';
 
 function extractNodePath(command) {
   const m = /^"([^"]+)"/.exec(command || '');
@@ -60,7 +60,16 @@ export async function runStatus({ home = homedir(), log = console.log } = {}) {
   }
 
   // Hook file
-  add(isHookRuntimeInstalled(paths.hookFile), `Hook: ${paths.hookFile} + ${runtimeDir(paths.hookFile)}`, 'chạy lại init để copy hook');
+  const hookInstalled = isHookRuntimeInstalled(paths.hookFile);
+  add(hookInstalled, `Hook: ${paths.hookFile} + ${runtimeDir(paths.hookFile)}`, 'chạy lại init để copy hook');
+  if (hookInstalled) {
+    const stale = isHookRuntimeStale(paths.hookFile);
+    add(
+      !stale,
+      stale ? 'Hook đã cài KHÁC bản CLI đang chạy' : 'Hook đã cài khớp bản CLI đang chạy',
+      'chạy lại init để cập nhật hook'
+    );
+  }
 
   // Settings entries + node path còn tồn tại
   let settings = {};
