@@ -14,3 +14,5 @@ starting with `🛑` and add this marker:
 `<!-- AI_NOTIFY_ESCALATE -->`
 
 Also use it when you stop to wait for the user to choose a direction or confirm something (e.g. "which option?", "push now?"): without a marker nothing is sent, so the user would not know you are waiting. One short `🛑` line saying what you need is enough.
+
+Do not add any marker when you only stop to wait for background work to finish (a workflow, subagent, background command, CI...) and the user has nothing to do.

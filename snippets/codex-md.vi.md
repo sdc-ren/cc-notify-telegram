@@ -14,3 +14,5 @@ một dòng bắt đầu bằng `🛑` mô tả việc cần xử lý, kèm mark
 `<!-- AI_NOTIFY_ESCALATE -->`
 
 Cũng dùng khi bạn dừng để chờ người dùng chọn hướng hoặc xác nhận (vd "chọn phương án nào?", "push luôn không?"): thiếu marker thì không có tin nào được gửi nên người dùng không biết bạn đang chờ. Chỉ cần một dòng `🛑` ngắn nêu rõ cần gì.
+
+KHÔNG gắn marker nào khi bạn chỉ dừng để chờ việc nền tự chạy xong (workflow, subagent, lệnh chạy nền, CI...) mà người dùng không cần làm gì.
