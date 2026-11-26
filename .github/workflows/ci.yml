@@ -10,8 +10,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        node: [18, 22]
+        # Bản Node thấp nhất còn hỗ trợ (22) + bản mới nhất (26) trên Ubuntu;
+        # macOS/Windows chỉ cần bản mới nhất để bắt lỗi theo hệ điều hành.
+        include:
+          - { os: ubuntu-latest, node: 22 }
+          - { os: ubuntu-latest, node: 26 }
+          - { os: macos-latest, node: 26 }
+          - { os: windows-latest, node: 26 }
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
