@@ -23,7 +23,7 @@ must do, plus the marker `<!-- CC_NOTIFY_ESCALATE -->` on its own line.
 
 Also use ESCALATE when you stop to **wait for the user to choose a direction or confirm something** (e.g. "which option?", "commit and push now?", "need QC input") — the Stop hook sends nothing without a marker, so the user would never know you are waiting. Keep it to one short `🛑` line saying what you need.
 
-**Do NOT** add ESCALATE (nor DONE) when you only stop to **wait for background work to finish** (a workflow, subagent, `run_in_background` command, CI...) and the user has nothing to do — you will be re-invoked when it finishes. End that message **with no marker** (nothing is sent to Telegram).
+**Do NOT** add ESCALATE (nor DONE) when you only stop to **wait for background work to finish** (a workflow, subagent, `run_in_background` command, CI...) and the user has nothing to do — you will be re-invoked when it finishes. End that message **with no marker** (nothing is sent to Telegram) — no `CC_NOTIFY_DONE` line at all, not even `CC_NOTIFY_DONE: not done yet…`.
 
 When writing a plan (plan mode), keep the Telegram message short but complete:
 - Open questions or decisions that need settling: ask **right away** — ask them with `AskUserQuestion` **BEFORE** calling `ExitPlanMode`; do not leave an "Open questions" or "Decisions needed" section in the plan you present.

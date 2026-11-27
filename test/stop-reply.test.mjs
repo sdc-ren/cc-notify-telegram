@@ -82,7 +82,7 @@ function stopHarness({ idle = 600, last = ESCALATE, cfgExtra = {} } = {}) {
   };
   const payload = { session_id: 'sess-abcd', cwd: '/x/proj', transcript_path: transcript, last_assistant_message: last };
   const run = () => runStop(payload, cfg, tg, {}, { home, deps: { idleSeconds: () => idleRef.value } });
-  return { cfg, tg, sent, edits, idleRef, run };
+  return { cfg, tg, sent, edits, idleRef, run, payloadTranscript: transcript };
 }
 
 const cb = (data, fromId = 111) => ({
@@ -149,4 +149,34 @@ test('runStop: tin DONE không bao giờ chờ', async () => {
   const h = stopHarness({ last: 'xong\n<!-- CC_NOTIFY_DONE: a | b -->' });
   assert.equal(await h.run(), null);
   assert.equal(h.sent[0].opts?.reply_markup, undefined);
+});
+
+// --- ✅ khi lượt vừa giao việc chạy nền ---
+
+const toolUse = (name, input, id = 'tu1') => line({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name, input }] } });
+const toolResult = (id, text) => line({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id: id, content: text }] } });
+
+test('startedBackgroundWork: Workflow / Agent chạy nền trong lượt này', async () => {
+  const { startedBackgroundWork } = await import('../hook/notify-telegram.mjs');
+  assert.equal(startedBackgroundWork([userPrompt('build'), toolUse('Workflow', {}), toolResult('tu1', 'Workflow launched in background. Task ID: x')]), true);
+  assert.equal(startedBackgroundWork([userPrompt('x'), toolUse('Agent', { run_in_background: true })]), true);
+  assert.equal(startedBackgroundWork([userPrompt('x'), toolUse('Agent', {}), toolResult('tu1', 'Async agent launched and running in the background')]), true);
+  // Agent chạy xong ngay trong lượt, Bash chạy nền (dev server) → không tính
+  assert.equal(startedBackgroundWork([userPrompt('x'), toolUse('Agent', {}), toolResult('tu1', 'Found 3 files')]), false);
+  assert.equal(startedBackgroundWork([userPrompt('x'), toolUse('Bash', { command: 'npm run dev', run_in_background: true })]), false);
+  // Việc nền xong → Claude được gọi lại bằng <task-notification> = lượt mới
+  assert.equal(startedBackgroundWork([userPrompt('x'), toolUse('Workflow', {}), userPrompt('<task-notification>done</task-notification>')]), false);
+});
+
+test('runStop: ✅ trong lượt vừa chạy Workflow nền → không gửi; 🛑 vẫn gửi', async () => {
+  const done = stopHarness({ idle: 10, last: 'đang chạy\n<!-- CC_NOTIFY_DONE: không — run đang chạy nền, chưa xong -->' });
+  const transcript = done.payloadTranscript;
+  writeFileSync(transcript, [userPrompt('build'), toolUse('Workflow', {})].join('\n'));
+  assert.equal(await done.run(), null);
+  assert.equal(done.sent.length, 0);
+
+  const esc = stopHarness({ idle: 10 });
+  writeFileSync(esc.payloadTranscript, [userPrompt('build'), toolUse('Workflow', {})].join('\n'));
+  await esc.run();
+  assert.equal(esc.sent.length, 1);
 });

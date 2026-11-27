@@ -39,6 +39,8 @@ All notable changes to this project are documented here. The format is based on
   waits for background work (workflows, subagents, background commands).
 
 ### Fixed
+- No ✅ message when Claude wrongly adds a done marker in a turn that just
+  started a background workflow or subagent; it reports when the work finishes.
 - Telegram calls no longer fail on networks with broken IPv6 and slow IPv4
   (longer connect attempts, one safe retry on connection errors).
 - `status` and `init` no longer blame the bot token for network errors.
