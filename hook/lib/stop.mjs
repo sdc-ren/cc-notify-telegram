@@ -153,6 +153,44 @@ export function lastWrapUp(lines) {
   return found;
 }
 
+// Lượt hiện tại có vừa giao việc chạy nền (Workflow, subagent chạy nền) chưa xong không.
+// Khi việc nền xong, Claude được gọi lại bằng một tin user mới (<task-notification>) — đó là
+// lượt mới, nên chỉ xét từ tin user thật cuối cùng. Lệnh Bash chạy nền KHÔNG tính (dev server
+// chạy nền là chuyện thường, lượt đó vẫn có thể xong thật).
+const BACKGROUND_RESULT_RE = /\b(launched|running|started|runs)\b[^\n]{0,40}\bin (the )?background\b/i;
+
+function toolResultText(block) {
+  const c = block?.content;
+  if (typeof c === 'string') return c;
+  return Array.isArray(c) ? c.map((x) => (typeof x?.text === 'string' ? x.text : '')).join(' ') : '';
+}
+
+export function startedBackgroundWork(lines) {
+  let started = false;
+  const agentIds = new Set();
+  for (const entry of parseJsonl(lines.slice(-300))) {
+    if (isRealUserPrompt(entry)) {
+      started = false;
+      agentIds.clear();
+      continue;
+    }
+    if (entry?.isSidechain === true) continue;
+    for (const block of entry?.message?.content || []) {
+      if (entry.type === 'assistant' && block?.type === 'tool_use') {
+        if (block.name === 'Workflow') started = true;
+        if (block.name === 'Agent' || block.name === 'Task') {
+          if (block.input?.run_in_background === true) started = true;
+          else agentIds.add(block.id);
+        }
+      }
+      if (entry.type === 'user' && block?.type === 'tool_result' && agentIds.has(block.tool_use_id)) {
+        if (BACKGROUND_RESULT_RE.test(toolResultText(block))) started = true;
+      }
+    }
+  }
+  return started;
+}
+
 // callback_data: chữ số = lựa chọn thứ n, `l` = để máy xử lý.
 export function stopKeyboard(key, choices, str) {
   return {
@@ -272,7 +310,10 @@ export async function runStop(payload, cfg, tg, env, { home = homedir(), deps } 
   const lines = hasTranscript ? readFileSync(transcript, 'utf8').split('\n').filter(Boolean) : [];
   const str = strings(cfg);
   const last = payload.last_assistant_message || lastAssistantText(lines);
-  const message = buildStopMessage({ last, project: projectName(payload, env), snippet: firstUserSnippet(lines), str });
+  let message = buildStopMessage({ last, project: projectName(payload, env), snippet: firstUserSnippet(lines), str });
+  // ✅ trong khi lượt này vừa giao việc chạy nền → chưa xong thật (Claude ghi nhầm marker); bỏ.
+  // Khi việc nền xong Claude được gọi lại và sẽ báo ở lượt đó.
+  if (message && !last.includes(MARKER_ESCALATE) && startedBackgroundWork(lines)) message = null;
   // Quét pending mồ côi của session này (user Esc câu hỏi → PostToolUse không bắn).
   await sweepSessionPending(payload.session_id, cfg, tg, home).catch(() => {});
   if (!message) return null;

@@ -23,7 +23,7 @@ dùng làm, kèm marker `<!-- CC_NOTIFY_ESCALATE -->` trên dòng riêng.
 
 Cũng dùng ESCALATE khi bạn dừng để **chờ người dùng chọn hướng hoặc xác nhận** (vd "chọn phương án nào?", "commit và push luôn không?", "cần QC bổ sung") — Stop hook không gửi gì nếu thiếu marker nên người dùng sẽ không biết bạn đang chờ. Chỉ cần một dòng `🛑` ngắn nêu rõ cần gì.
 
-**KHÔNG** gắn ESCALATE (cũng không gắn DONE) khi bạn chỉ dừng để **chờ việc nền tự chạy xong** (workflow, subagent, lệnh `run_in_background`, CI...) mà người dùng không cần làm gì — khi việc nền xong bạn sẽ được gọi lại và tự tiếp tục. Khi đó kết thúc tin nhắn **không có marker** (không gửi Telegram).
+**KHÔNG** gắn ESCALATE (cũng không gắn DONE) khi bạn chỉ dừng để **chờ việc nền tự chạy xong** (workflow, subagent, lệnh `run_in_background`, CI...) mà người dùng không cần làm gì — khi việc nền xong bạn sẽ được gọi lại và tự tiếp tục. Khi đó kết thúc tin nhắn **không có marker** (không gửi Telegram) — tức là không có dòng `CC_NOTIFY_DONE` nào, kể cả kiểu `CC_NOTIFY_DONE: chưa xong…`.
 
 Khi lập plan (plan mode), để tin Telegram gọn và đủ ý:
 - Câu hỏi mở hoặc quyết định cần chốt thì hỏi **ngay** — hỏi bằng `AskUserQuestion` **TRƯỚC** khi gọi `ExitPlanMode`; đừng để lại mục "Câu hỏi mở" hay "Quyết định cần chốt" trong plan đã trình.
