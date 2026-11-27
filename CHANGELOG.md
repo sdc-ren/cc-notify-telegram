@@ -39,6 +39,9 @@ All notable changes to this project are documented here. The format is based on
   waits for background work (workflows, subagents, background commands).
 
 ### Fixed
+- macOS/Linux: hooks keep working after the Node used at install is removed
+  (nvm or Homebrew version change). They run through a small launcher that finds
+  another Node 22+; `status` shows which Node is used. Re-run `init` to switch.
 - No ✅ message when Claude wrongly adds a done marker in a turn that just
   started a background workflow or subagent; it reports when the work finishes.
 - Telegram calls no longer fail on networks with broken IPv6 and slow IPv4

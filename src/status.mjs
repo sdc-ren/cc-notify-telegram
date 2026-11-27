@@ -1,5 +1,6 @@
 // Doctor: kiểm tra từng mắt xích của chuỗi notify và in ✓/✗ kèm cách sửa.
 
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 
@@ -11,14 +12,44 @@ import {
   makeTelegram,
   networkErrorDetail,
 } from '../hook/notify-telegram.mjs';
-import { HOOK_ENTRIES } from './settings.mjs';
+import { HOOK_ENTRIES, parseHookCommand } from './settings.mjs';
 import { hasBlock } from './snippet.mjs';
 import { installPaths } from './init.mjs';
 import { isHookRuntimeInstalled, isHookRuntimeStale, runtimeDir } from './hook-runtime.mjs';
 
-function extractNodePath(command) {
-  const m = /^"([^"]+)"/.exec(command || '');
-  return m ? m[1] : null;
+// Node mà launcher sẽ dùng (Node lúc cài, hoặc Node khác nó tìm được); null nếu không có.
+export function launcherNode(launcherPath, recordedNode, run = execFileSync) {
+  try {
+    const out = run('/bin/sh', [launcherPath, '--which', recordedNode || ''], { encoding: 'utf8', timeout: 10000 });
+    return String(out).trim() || null;
+  } catch {
+    return null;
+  }
+}
+
+// Một dòng ✓/✗ cho Node của các hook (mọi hook dùng chung một command nên chỉ cần kiểm 1 lần).
+export function nodeCheck(command, { exists = existsSync, whichNode = launcherNode } = {}) {
+  const { launcherPath, nodePath } = parseHookCommand(command);
+  if (!launcherPath) {
+    const ok = Boolean(nodePath && exists(nodePath));
+    return {
+      ok,
+      label: `Node của hook: ${nodePath || '?'}`,
+      fix: 'node đã bị xoá/đổi version — chạy lại init',
+    };
+  }
+  if (!exists(launcherPath)) {
+    return { ok: false, label: `Thiếu ${launcherPath}`, fix: 'chạy lại init' };
+  }
+  const used = whichNode(launcherPath, nodePath);
+  if (!used) {
+    return { ok: false, label: 'Không tìm thấy Node >= 22 nào cho hook', fix: 'cài Node >= 22 rồi chạy lại init' };
+  }
+  if (used === nodePath) return { ok: true, label: `Node của hook: ${used}` };
+  return {
+    ok: true,
+    label: `Node lúc cài (${nodePath}) không còn — hook đang dùng ${used}; nên chạy lại init`,
+  };
 }
 
 export async function runStatus({ home = homedir(), log = console.log } = {}) {
@@ -71,13 +102,14 @@ export async function runStatus({ home = homedir(), log = console.log } = {}) {
     );
   }
 
-  // Settings entries + node path còn tồn tại
+  // Settings entries + Node mà hook sẽ chạy
   let settings = {};
   try {
     settings = JSON.parse(readFileSync(paths.settingsFile, 'utf8'));
   } catch {
     add(false, `Không đọc được ${paths.settingsFile}`, 'chạy lại init');
   }
+  let commandForNode = null;
   for (const spec of HOOK_ENTRIES) {
     const groups = settings?.hooks?.[spec.event] || [];
     const ours = groups.find((g) =>
@@ -87,10 +119,12 @@ export async function runStatus({ home = homedir(), log = console.log } = {}) {
       add(false, `settings.json thiếu hook ${spec.event}`, 'chạy lại init');
       continue;
     }
-    const command = ours.hooks.find((h) => (h.command || '').includes('cc-notify-telegram.mjs'))?.command;
-    const nodePath = extractNodePath(command);
-    const nodeOk = nodePath && existsSync(nodePath);
-    add(nodeOk, `Hook ${spec.event} → node ${nodePath || '?'}`, nodeOk ? '' : 'node đã bị xoá/đổi version — chạy lại init');
+    add(true, `Hook ${spec.event} đã đăng ký`);
+    commandForNode ??= ours.hooks.find((h) => (h.command || '').includes('cc-notify-telegram.mjs'))?.command;
+  }
+  if (commandForNode) {
+    const node = nodeCheck(commandForNode);
+    add(node.ok, node.label, node.fix);
   }
 
   // CLAUDE.md snippet

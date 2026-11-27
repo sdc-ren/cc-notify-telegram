@@ -21,6 +21,10 @@ export function runtimeDir(hookFile) {
   return join(dirname(hookFile), RUNTIME_DIR_NAME);
 }
 
+export function launcherPath(hookFile) {
+  return join(runtimeDir(hookFile), 'node-launcher.sh');
+}
+
 // Copy lại toàn bộ (xoá bản cũ trước để không sót module đã bị bỏ), rồi ghi shim.
 export function installHookRuntime(hookFile, { sourceDir = HOOK_SOURCE_DIR } = {}) {
   const dir = runtimeDir(hookFile);
@@ -28,7 +32,10 @@ export function installHookRuntime(hookFile, { sourceDir = HOOK_SOURCE_DIR } = {
   rmSync(dir, { recursive: true, force: true });
   cpSync(sourceDir, dir, { recursive: true });
   writeFileSync(hookFile, SHIM);
-  if (process.platform !== 'win32') chmodSync(hookFile, 0o755);
+  if (process.platform !== 'win32') {
+    chmodSync(hookFile, 0o755);
+    if (existsSync(launcherPath(hookFile))) chmodSync(launcherPath(hookFile), 0o755);
+  }
   return dir;
 }
 
@@ -50,7 +57,7 @@ export function isHookRuntimeInstalled(hookFile) {
   return existsSync(hookFile) && existsSync(join(runtimeDir(hookFile), 'notify-telegram.mjs'));
 }
 
-// Dấu vân tay nội dung một thư mục runtime (đường dẫn tương đối + nội dung từng file .mjs).
+// Dấu vân tay nội dung một thư mục runtime (đường dẫn tương đối + nội dung từng file .mjs/.sh).
 // Không phụ thuộc số version: đổi bất kỳ dòng nào trong hook/ là khác.
 export function runtimeFingerprint(dir) {
   if (!existsSync(dir)) return null;
@@ -59,7 +66,7 @@ export function runtimeFingerprint(dir) {
     for (const entry of readdirSync(d, { withFileTypes: true })) {
       const full = join(d, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (entry.name.endsWith('.mjs')) files.push(full);
+      else if (entry.name.endsWith('.mjs') || entry.name.endsWith('.sh')) files.push(full);
     }
   };
   walk(dir);
