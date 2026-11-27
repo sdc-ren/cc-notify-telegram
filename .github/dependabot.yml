@@ -1,7 +1,12 @@
 # No npm dependencies to update; keep the GitHub Actions used by CI current.
+# Checked monthly, all updates grouped into a single PR.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
