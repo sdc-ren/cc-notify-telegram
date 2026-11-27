@@ -272,7 +272,7 @@ trả decision allow/deny về Claude → lệnh chạy / bị chặn
 | `cc-notify-telegram test` | Gửi tin test |
 | `cc-notify-telegram status` | Doctor: kiểm tra từng mắt xích của chuỗi notify, kèm cách sửa |
 | `cc-notify-telegram topics` | Liệt kê topic ID của group mà bot vừa thấy (để đặt `threadId`) |
-| `cc-notify-telegram away <phút> [--skip]` / `away off` | macOS: vừa dùng máy trong N phút thì tin xong việc/🛑/thông báo gửi không chuông (`--skip`: không gửi). Câu hỏi, xin quyền, duyệt plan không bị ảnh hưởng |
+| `cc-notify-telegram away <phút> [--skip]` / `away off` | macOS: vừa dùng máy trong N phút thì tin xong việc/🛑/thông báo gửi không chuông (`--skip`: không gửi). Câu hỏi, xin quyền, duyệt plan không bị ảnh hưởng. Khi vắng máy và Remote bật, tin 🛑 kèm các nút trả lời lấy từ hộp "bước tiếp theo" của app Claude desktop (hoặc REPLY chữ tự do): câu trả lời được gửi vào cho Claude làm tiếp |
 | `cc-notify-telegram remote on\|off` | Bật/tắt Remote Ask |
 | `cc-notify-telegram remote-perm on\|off` | Bật/tắt Remote Permission (và duyệt plan) |
 | `cc-notify-telegram uninstall` | Gỡ hooks (`--purge`: xoá cả config/token, state, block trong `CLAUDE.md`) |

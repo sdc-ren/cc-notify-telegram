@@ -213,7 +213,7 @@ answer returned to Claude → it continues
 | `test` | Send a test message |
 | `status` | Health check of the whole notify chain, with how to fix each problem |
 | `topics` | List the group's topic IDs the bot has seen recently (for `threadId`) |
-| `away <minutes> [--skip]` / `away off` | macOS: if you used the Mac in the last N minutes, completion/🛑/notification messages arrive without sound (`--skip`: not sent). Questions, permissions and plans are unaffected |
+| `away <minutes> [--skip]` / `away off` | macOS: if you used the Mac in the last N minutes, completion/🛑/notification messages arrive without sound (`--skip`: not sent). Questions, permissions and plans are unaffected. While you are away and Remote is on, 🛑 messages come with the reply buttons from the Claude desktop app's next-step box (or REPLY with free text): your answer goes back to Claude and it keeps working |
 | `remote on\|off` | Toggle Remote Ask |
 | `remote-perm on\|off` | Toggle Remote Permission (and plan review) |
 | `uninstall [--purge]` | Remove hooks. `--purge` also removes config/token, state and the `CLAUDE.md` block |

@@ -5,12 +5,12 @@
 export const HOOK_FILENAME = 'cc-notify-telegram.mjs';
 export const LEGACY_HOOK_FILENAME = 'notify-telegram.sh';
 
-// PreToolUse/PermissionRequest timeout phải DÀI HƠN remoteAskTimeoutSec (tối đa 1770s)
+// Stop/PreToolUse/PermissionRequest timeout phải DÀI HƠN remoteAskTimeoutSec (tối đa 1770s)
 // để hook kịp chờ trả lời.
 // PermissionRequest KHÔNG đặt matcher = áp mọi tool; event này chỉ bắn khi hộp thoại quyền
 // sắp hiện, nên không phát sinh chi phí cho tool đã được allow-rule duyệt sẵn.
 export const HOOK_ENTRIES = [
-  { event: 'Stop', arg: 'stop', timeout: 20 },
+  { event: 'Stop', arg: 'stop', timeout: 1830 },
   { event: 'PreToolUse', arg: 'ask', matcher: 'AskUserQuestion', timeout: 1830 },
   { event: 'PostToolUse', arg: 'ask-done', matcher: 'AskUserQuestion', timeout: 20 },
   { event: 'Notification', arg: 'notify', timeout: 20 },
