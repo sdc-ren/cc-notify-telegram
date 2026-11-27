@@ -57,6 +57,13 @@ const STRINGS = {
     planFeedbackSent: (who, text) => `✏️ Đã gửi góp ý${who}: "${text}"`,
     planRejectReason:
       'Người dùng CHƯA DUYỆT plan này qua Telegram (không kèm góp ý). Hãy giữ nguyên plan mode, hỏi lại người dùng cần chỉnh gì rồi sửa plan.',
+    stopFooter: (min) =>
+      `👇 Chọn bên dưới hoặc REPLY tin này để trả lời Claude (chờ tối đa ${min} phút) — chỉ tài khoản trong allowlist mới thao tác được.`,
+    stopAnswered: (who, text) => `✅ Đã gửi cho Claude${who}: "${text}"`,
+    stopAnswerReason: (text) => `Người dùng trả lời qua Telegram: "${text}". Hãy tiếp tục theo câu trả lời này.`,
+    stopMovedLocal: '🖥 Để trả lời tại máy.',
+    stopTimedOut: '⏰ Hết giờ chờ trên Telegram — trả lời tại máy.',
+    stopClosedLocal: '🖥 Đã xử lý tại máy.',
     planFeedbackReason: (text) =>
       `Người dùng xem plan qua Telegram và CHƯA DUYỆT, góp ý: "${text}". Hãy giữ nguyên plan mode, chỉnh plan theo góp ý rồi trình lại.`,
   },
@@ -113,6 +120,13 @@ const STRINGS = {
     planFeedbackSent: (who, text) => `✏️ Feedback sent${who}: "${text}"`,
     planRejectReason:
       'The user did NOT approve this plan via Telegram (no feedback given). Stay in plan mode, ask the user what to change, then revise the plan.',
+    stopFooter: (min) =>
+      `👇 Choose below or REPLY to this message to answer Claude (waits up to ${min} min) — only allowlisted accounts can act.`,
+    stopAnswered: (who, text) => `✅ Sent to Claude${who}: "${text}"`,
+    stopAnswerReason: (text) => `The user answered via Telegram: "${text}". Continue based on this answer.`,
+    stopMovedLocal: '🖥 Answer at the machine.',
+    stopTimedOut: '⏰ Telegram wait timed out — answer at the machine.',
+    stopClosedLocal: '🖥 Handled at the machine.',
     planFeedbackReason: (text) =>
       `The user reviewed the plan via Telegram and did NOT approve it. Feedback: "${text}". Stay in plan mode, revise the plan accordingly and present it again.`,
   },

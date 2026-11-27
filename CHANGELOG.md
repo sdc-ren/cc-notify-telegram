@@ -16,6 +16,11 @@ All notable changes to this project are documented here. The format is based on
   told to ask those with `AskUserQuestion` before presenting a plan.
 
 ### Added
+- Answer 🛑 messages from Telegram while you are away (needs `away` and Remote):
+  the message carries the reply buttons from the Claude desktop app's next-step
+  box, or you can REPLY with free text. Claude continues with your answer. The
+  Stop hook waits up to `remoteAskTimeoutSec` and lets go as soon as you are back
+  at the Mac. Re-run `init` (the Stop hook timeout grows to 1830s).
 - `away <minutes> [--skip]` / `away off` (macOS): completion, 🛑 and notification
   messages are sent without sound, or skipped, while you are using the Mac.
 - `topics` command to list a group's topic IDs.

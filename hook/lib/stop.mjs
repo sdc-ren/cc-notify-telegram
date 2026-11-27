@@ -1,10 +1,14 @@
 // EVENT stop — đọc tin cuối trong transcript, tách marker DONE/ESCALATE.
 
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { MARKER_DONE, MARKER_ESCALATE } from './config.mjs';
-import { projectName, strings } from './strings.mjs';
+import { buildTag, projectName, strings } from './strings.mjs';
 import { sweepSessionPending } from './ask.mjs';
-import { sendAwayAware } from './presence.mjs';
+import { isUserAway, sendAwayAware, userIdleSeconds } from './presence.mjs';
+import { ensureStateDirs, gcStateDir, pendingKey, pendingPath } from './state.mjs';
+import { isLocalKeyword, waitForReply } from './poller.mjs';
+import { closeOnSignal } from './perm.mjs';
 
 export function parseJsonl(lines) {
   const out = [];
@@ -117,7 +121,152 @@ export function buildStopMessage({ last, project, snippet, str }) {
   return `✅ ${project} — ${str.donePlain}`;
 }
 
-export async function runStop(payload, cfg, tg, env) {
+// Hộp "bước tiếp theo" của app desktop (tool mcp__ccd_turn__wrap_up) trong lượt hiện tại:
+// { recap, ask, choices[] }. Không có (CLI, hoặc lượt chưa gọi) → null.
+const MAX_CHOICES = 6;
+
+function isRealUserPrompt(entry) {
+  if (entry?.type !== 'user' || entry.isSidechain === true || entry.isMeta === true) return false;
+  const content = entry.message?.content;
+  if (typeof content === 'string') return content.trim() !== '';
+  return Array.isArray(content) && content.some((b) => b?.type === 'text');
+}
+
+export function lastWrapUp(lines) {
+  let found = null;
+  for (const entry of parseJsonl(lines.slice(-300))) {
+    if (isRealUserPrompt(entry)) {
+      found = null; // wrap_up của lượt trước không còn giá trị
+      continue;
+    }
+    if (entry?.type !== 'assistant' || entry.isSidechain === true) continue;
+    for (const block of entry.message?.content || []) {
+      if (block?.type !== 'tool_use' || !/(^|__)wrap_up$/.test(String(block.name || ''))) continue;
+      const input = block.input || {};
+      const choices = (Array.isArray(input.actions) ? input.actions : [])
+        .map((a) => String(a?.label || a?.action || '').trim())
+        .filter(Boolean)
+        .slice(0, MAX_CHOICES);
+      found = { recap: String(input.recap || '').trim(), ask: String(input.ask || '').trim(), choices };
+    }
+  }
+  return found;
+}
+
+// callback_data: chữ số = lựa chọn thứ n, `l` = để máy xử lý.
+export function stopKeyboard(key, choices, str) {
+  return {
+    inline_keyboard: [
+      ...choices.map((label, i) => [{ text: label, callback_data: `${i}:${key}` }]),
+      [{ text: str.btnLocal, callback_data: `l:${key}` }],
+    ],
+  };
+}
+
+export function buildStopAskMessage({ escalateLine, tag, wrapUp, str, waitMin }) {
+  const out = [escalateLine, tag];
+  if (wrapUp?.recap) out.push('', wrapUp.recap);
+  if (wrapUp?.ask) out.push('', `❓ ${wrapUp.ask}`);
+  out.push('', str.stopFooter(waitMin));
+  return out.join('\n');
+}
+
+export function stopBlockOutput(reason) {
+  return JSON.stringify({ decision: 'block', reason });
+}
+
+const capText = (text, max) => (Array.from(text).length > max ? Array.from(text).slice(0, max).join('') + '…' : text);
+
+// Đang vắng máy + Remote bật → gửi tin 🛑 kèm nút, giữ lượt lại chờ trả lời rồi đưa câu trả lời
+// cho Claude làm tiếp (Stop hook `decision: block`). Trả null nếu không chờ được / không ai trả lời.
+export async function promptStopReply({ payload, cfg, tg, env, home = homedir(), last, lines, deps = {} }) {
+  const str = strings(cfg);
+  const project = projectName(payload, env);
+  const suffix = String(payload.session_id || '').slice(-4);
+  const wrapUp = lastWrapUp(lines);
+  const text = buildStopAskMessage({
+    escalateLine: extractEscalateLine(last, str),
+    tag: buildTag({ project, suffix }),
+    wrapUp,
+    str,
+    waitMin: Math.round(cfg.remoteAskTimeoutSec / 60),
+  });
+
+  const dir = ensureStateDirs(home);
+  gcStateDir(dir);
+  const key = pendingKey(payload.session_id, [{ question: `Stop:${last}` }]);
+  const choices = wrapUp?.choices || [];
+  let sent;
+  try {
+    sent = await tg.sendMessage(capText(text, 3900), { reply_markup: stopKeyboard(key, choices, str) });
+  } catch {
+    return { type: 'send-failed' };
+  }
+  if (!sent?.message_id) return { type: 'send-failed' };
+  const anchorId = sent.message_id;
+  const shown = capText(text, 3500);
+  const settle = (status) => tg.editMessageText(anchorId, `${shown}\n\n${status}`).catch(() => {});
+
+  writeFileSync(
+    pendingPath(dir, key),
+    JSON.stringify({ kind: 'stop', messageId: anchorId, messageIds: [anchorId], sessionId: payload.session_id || '', sentAt: Date.now() })
+  );
+  const dropPending = () => {
+    try {
+      unlinkSync(pendingPath(dir, key));
+    } catch {
+      // đã bị sweep
+    }
+  };
+  // Người dùng Esc / gõ tại máy → Claude Code tắt hook → đóng tin, gỡ nút.
+  const stopWatching = closeOnSignal(() => {
+    dropPending();
+    return settle(str.stopClosedLocal);
+  });
+
+  const idleSeconds = deps.idleSeconds || userIdleSeconds;
+  let outcome;
+  try {
+    outcome = await waitForReply({
+      tg,
+      cfg,
+      dir,
+      ownMessageIds: [anchorId],
+      deadline: Date.now() + cfg.remoteAskTimeoutSec * 1000,
+      env,
+      home,
+      // Người dùng về lại máy (vừa đụng phím/chuột) → nhả lượt để trả lời tại máy.
+      abortIf: () => {
+        const idle = idleSeconds();
+        return idle != null && idle < 30;
+      },
+    });
+  } finally {
+    stopWatching();
+    dropPending();
+  }
+
+  const who = outcome.fromName ? ` (${outcome.fromName})` : '';
+  let answer = null;
+  if (outcome.type === 'callback' && /^\d$/.test(outcome.action)) answer = choices[Number(outcome.action)] ?? null;
+  if (outcome.type === 'reply' && outcome.text && !isLocalKeyword(outcome.text)) answer = outcome.text;
+  if (answer) {
+    await settle(str.stopAnswered(who, capText(answer, 300)));
+    return { type: 'answer', output: stopBlockOutput(str.stopAnswerReason(answer)) };
+  }
+  await settle(outcome.type === 'timeout' ? str.stopTimedOut : str.stopMovedLocal);
+  return { type: outcome.type };
+}
+
+// Có nên giữ lượt chờ trả lời từ Telegram không: chỉ tin 🛑, Remote bật, có allowlist, và
+// đo được là người dùng đang vắng máy.
+export function shouldWaitForReply(last, cfg, deps) {
+  if (!last.includes(MARKER_ESCALATE)) return false;
+  if (!cfg.remote || !cfg.allowedUserIds?.length) return false;
+  return isUserAway(cfg, deps);
+}
+
+export async function runStop(payload, cfg, tg, env, { home = homedir(), deps } = {}) {
   const transcript = payload.transcript_path;
   const hasTranscript = transcript && existsSync(transcript);
   const lines = hasTranscript ? readFileSync(transcript, 'utf8').split('\n').filter(Boolean) : [];
@@ -125,6 +274,13 @@ export async function runStop(payload, cfg, tg, env) {
   const last = payload.last_assistant_message || lastAssistantText(lines);
   const message = buildStopMessage({ last, project: projectName(payload, env), snippet: firstUserSnippet(lines), str });
   // Quét pending mồ côi của session này (user Esc câu hỏi → PostToolUse không bắn).
-  await sweepSessionPending(payload.session_id, cfg, tg).catch(() => {});
-  if (message) await sendAwayAware(tg, cfg, message);
+  await sweepSessionPending(payload.session_id, cfg, tg, home).catch(() => {});
+  if (!message) return null;
+  if (shouldWaitForReply(last, cfg, deps)) {
+    const res = await promptStopReply({ payload, cfg, tg, env, home, last, lines, deps }).catch(() => ({ type: 'error' }));
+    if (res.type === 'answer') return res.output;
+    if (res.type !== 'send-failed' && res.type !== 'error') return null; // tin đã gửi (kèm trạng thái)
+  }
+  await sendAwayAware(tg, cfg, message, deps);
+  return null;
 }

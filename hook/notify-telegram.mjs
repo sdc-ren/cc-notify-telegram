@@ -4,7 +4,8 @@
 // Installer copy file này + thư mục lib/ vào ~/.claude/hooks/cc-notify-telegram/, rồi ghi shim
 // ~/.claude/hooks/cc-notify-telegram.mjs gọi runCli() (đường dẫn hook trong settings giữ nguyên).
 // Phục vụ 5 hook event (arg đầu tiên quyết định event):
-//   stop      Stop hook              → báo Telegram khi tin cuối chứa marker CC_NOTIFY_DONE/ESCALATE
+//   stop      Stop hook              → báo Telegram khi tin cuối chứa marker CC_NOTIFY_DONE/ESCALATE;
+//                                       🛑 lúc vắng máy thì kèm nút, chờ trả lời rồi cho Claude làm tiếp
 //   ask       PreToolUse hook        → Remote Ask: gửi AskUserQuestion qua Telegram, chờ reply
 //   ask-done  PostToolUse hook       → chốt sổ tin câu hỏi khi user trả lời tại máy
 //   notify    Notification hook      → forward "cần permission / đang chờ input" khi remote bật
@@ -67,7 +68,7 @@ async function main() {
   }
   const tg = makeTelegram(cfg);
 
-  if (event === 'stop') return runStop(payload, cfg, tg, process.env).then(() => null);
+  if (event === 'stop') return runStop(payload, cfg, tg, process.env);
   if (event === 'ask') return runAsk(payload, cfg, tg, process.env);
   if (event === 'ask-done') return runAskDone(payload, cfg, tg).then(() => null);
   if (event === 'notify') return runNotify(payload, cfg, tg, process.env).then(() => null);

@@ -39,3 +39,12 @@ export async function sendAwayAware(tg, cfg, text, deps) {
   if (delivery === 'skip') return null;
   return tg.sendMessage(text, delivery === 'silent' ? { disable_notification: true } : {});
 }
+
+// Chỉ true khi chế độ vắng máy đang bật VÀ đo được người dùng đã rời máy đủ lâu
+// (không đo được → false: không giữ lượt chờ khi không chắc người dùng đi vắng).
+export function isUserAway(cfg, { idleSeconds = userIdleSeconds } = {}) {
+  const minutes = Number(cfg.awayMinutes);
+  if (!Number.isFinite(minutes) || minutes <= 0) return false;
+  const idle = idleSeconds();
+  return idle != null && idle >= minutes * 60;
+}

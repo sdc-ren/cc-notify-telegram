@@ -24,7 +24,7 @@ export function classifyUpdate(update, ctx) {
   if (cq) {
     if (String(cq.message?.chat?.id) !== String(ctx.chatId)) return { kind: 'ignore' };
     const messageId = cq.message?.message_id;
-    const action = String(cq.data || '').match(/^([adesl]):/)?.[1];
+    const action = String(cq.data || '').match(/^([adesl0-9]):/)?.[1];
     if (messageId == null || !action) return { kind: 'ignore' };
     // Nút của một yêu cầu không còn chờ nữa (đã xử lý tại máy / hủy / hết hạn) → báo cho người bấm.
     if (!ctx.pending.flatMap(idsOf).includes(messageId)) {
@@ -75,7 +75,7 @@ export function classifyUpdate(update, ctx) {
 // Vòng chờ trả lời: poller trung tâm (giữ lock) long-poll getUpdates và phân phát
 // reply/bấm nút vào inbox theo message_id; session không giữ lock chỉ watch inbox của mình.
 // mode 'ask' = chờ text reply; mode 'perm' = chờ bấm nút inline.
-export async function waitForReply({ tg, cfg, dir, ownMessageIds, deadline, env, home, mode = 'ask' }) {
+export async function waitForReply({ tg, cfg, dir, ownMessageIds, deadline, env, home, mode = 'ask', abortIf }) {
   const lockFile = join(dir, 'poll.lock');
   let holdingLock = false;
   let lastHintAt = 0;
@@ -85,6 +85,7 @@ export async function waitForReply({ tg, cfg, dir, ownMessageIds, deadline, env,
       // Đọc lại config MỖI vòng nên `remote off` / `remote-perm off` có hiệu lực ngay.
       const live = loadConfig({ env, home });
       if (!live.remote || (mode === 'perm' && !live.remotePermission)) return { type: 'remote-off' };
+      if (abortIf?.()) return { type: 'aborted' };
 
       // 1) inbox của mình có sẵn kết quả (poller khác phân phát)? — vào bất kỳ chunk nào
       for (const id of ownMessageIds) {
@@ -152,9 +153,9 @@ export async function waitForReply({ tg, cfg, dir, ownMessageIds, deadline, env,
             .catch(() => {});
           await tg.clearKeyboard(verdict.messageId).catch(() => {});
         } else if (verdict.kind === 'reply') {
-          // Reply vào tin PLAN là chỉ đạo thẳng cho agent → chỉ allowlist mới được góp ý.
+          // Reply vào tin PLAN / 🛑 là chỉ đạo thẳng cho agent → chỉ allowlist mới được trả lời.
           const target = pending.find((p) => idsOf(p).includes(verdict.messageId));
-          if (target?.kind === 'plan' && !live.allowedUserIds.includes(String(verdict.fromId))) continue;
+          if ((target?.kind === 'plan' || target?.kind === 'stop') && !live.allowedUserIds.includes(String(verdict.fromId))) continue;
           if (ownMessageIds.includes(verdict.messageId)) {
             return { type: 'reply', text: verdict.text, fromName: verdict.fromName || '' };
           }
