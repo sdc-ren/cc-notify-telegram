@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline/promises';
 
 import { loadConfig, makeTelegram, networkErrorDetail } from '../hook/notify-telegram.mjs';
-import { installHookRuntime } from './hook-runtime.mjs';
+import { installHookRuntime, launcherPath } from './hook-runtime.mjs';
 import { readConfig, readLegacyConf, writeConfig } from './config.mjs';
 import { findLegacyStopEntries, isInstalled, mergeSettings } from './settings.mjs';
 import { hasBlock, upsertBlock } from './snippet.mjs';
@@ -228,7 +228,9 @@ export async function runInit(flags, { home = homedir(), log = console.log } = {
       }
     }
     const nodePath = process.execPath; // path node TUYỆT ĐỐI — né nvm/PATH trong non-interactive shell
-    const merged = mergeSettings(settings, { nodePath, hookPath: paths.hookFile, removeLegacy });
+    // mac/linux: qua launcher để hook vẫn chạy khi Node này bị gỡ / đổi version.
+    const launcher = process.platform === 'win32' ? undefined : launcherPath(paths.hookFile);
+    const merged = mergeSettings(settings, { nodePath, hookPath: paths.hookFile, launcherPath: launcher, removeLegacy });
     if (JSON.stringify(merged) !== JSON.stringify(settings)) {
       backupThenWrite(paths.settingsFile, merged);
       log(

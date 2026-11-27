@@ -18,8 +18,18 @@ export const HOOK_ENTRIES = [
 ];
 
 // Path luôn bọc nháy kép: chịu được khoảng trắng trên cả sh (mac/linux) lẫn cmd (Windows).
-export function hookCommand(nodePath, hookPath, arg) {
+// mac/linux: chạy qua node-launcher.sh — Node lúc cài mà mất thì launcher tự tìm Node khác.
+// Windows: gọi thẳng Node như cũ.
+export function hookCommand(nodePath, hookPath, arg, launcherPath) {
+  if (launcherPath) return `"/bin/sh" "${launcherPath}" "${nodePath}" "${hookPath}" ${arg}`;
   return `"${nodePath}" "${hookPath}" ${arg}`;
+}
+
+// Tách { launcherPath, nodePath } từ command của mình (cả 2 dạng ở trên).
+export function parseHookCommand(command) {
+  const quoted = [...String(command || '').matchAll(/"([^"]*)"/g)].map((m) => m[1]);
+  if (quoted[1] && quoted[1].endsWith('node-launcher.sh')) return { launcherPath: quoted[1], nodePath: quoted[2] || null };
+  return { launcherPath: null, nodePath: quoted[0] || null };
 }
 
 function groupIsOurs(group) {
@@ -38,7 +48,7 @@ export function findLegacyStopEntries(settings) {
 
 // Trả về settings MỚI (không mutate input) đã có đủ 4 entry; removeLegacy=true thì
 // gỡ hook notify-telegram.sh cũ khỏi Stop (chỉ hook đó, giữ hook khác cùng group nếu có).
-export function mergeSettings(settings, { nodePath, hookPath, removeLegacy = false }) {
+export function mergeSettings(settings, { nodePath, hookPath, launcherPath, removeLegacy = false }) {
   const next = structuredClone(settings ?? {});
   next.hooks = next.hooks ?? {};
 
@@ -59,7 +69,7 @@ export function mergeSettings(settings, { nodePath, hookPath, removeLegacy = fal
       hooks: [
         {
           type: 'command',
-          command: hookCommand(nodePath, hookPath, spec.arg),
+          command: hookCommand(nodePath, hookPath, spec.arg, launcherPath),
           timeout: spec.timeout,
         },
       ],
